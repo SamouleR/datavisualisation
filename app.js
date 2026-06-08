@@ -63,10 +63,22 @@ const SLIDE_INSIGHTS = [
     {
         title: " Cinéma à la Télévision",
         text: "L'étude des 50 films les plus diffusés depuis 1950 montre une hégémonie culturelle des comédies populaires françaises des années 60-80 (ex: <span class='analysis-stat-highlight'>Le Capitan</span>, <span class='analysis-stat-highlight'>La Grande Vadrouille</span>). La télévision linéaire capitalise sur ces valeurs sûres en prime-time."
+    },
+    {
+        title: " Répartition des Genres",
+        text: "La répartition des genres télévisuels montre que certains types d'émissions (ex: sport) sont structurellement dominés par la parole masculine."
+    },
+    {
+        title: " Évolution Thématique (2000-2020)",
+        text: "Ce Streamgraph, issu du Baromètre de l'INA, montre comment l'agenda médiatique a basculé au fil du temps. On observe des pics correspondant aux grands événements (élections, crises) et l'émergence progressive de l'Environnement et de la Société."
+    },
+    {
+        title: " Spécialisation par Chaîne",
+        text: "Le graphique radial révèle la ligne éditoriale de chaque chaîne. Certaines se spécialisent dans le fait divers ou le sport, tandis que d'autres, notamment publiques, gardent une structure plus équilibrée entre Société, International et Culture."
     }
 ];
 
-const App = {
+var App = {
     dataChaines: [], dataGenres: [], dataMeta: [], dataFilms: [], movieCovers: {}, mediaLogos: {},
     currentSlide: 0, activeGender: 'H', activeSunburstGroups: new Set(['Tous']), selectedIds: new Set(), activeFilters: new Set(['Tous']),
 
@@ -121,7 +133,7 @@ const App = {
         });
 
         this.initTitleInteractions();
-        this.initSwitches();
+        // this.initSwitches(); // Now handled by React in App.jsx
 
         // Interactions au survol sur la galerie du mode visuel
         const compositionEl = document.querySelector('.svg-composition');
@@ -188,7 +200,10 @@ const App = {
                 d.Poster = this.movieCovers[d.Title] || ("https://placehold.co/300x450/5D4037/ffffff?text=" + encodeURIComponent(d.Title.substring(0,25))); 
             });
             
+
+
             this.setSlide(0);
+            Viz.renderArticleDonuts();
         } catch (e) { 
             console.error("Erreur critique lors du chargement des données.", e); 
         }
@@ -261,11 +276,12 @@ const App = {
     initTitleInteractions() {},
 
     initSwitches() {
-        const toggleTheme = document.getElementById('toggle-theme');
+        const btnArticle = document.getElementById('nav-mode-article');
         const btnGraphique = document.getElementById('nav-mode-graphique');
         const btnCrea = document.getElementById('nav-mode-crea');
         const btnVisuel = document.getElementById('nav-mode-visuel');
         
+        const articleView = document.getElementById('article-view');
         const analyticView = document.getElementById('analytic-view');
         const artisticView = document.getElementById('artistic-view');
         const visuelView = document.getElementById('visuel-view');
@@ -276,14 +292,25 @@ const App = {
         });
 
         const resetViews = () => {
+            if(articleView) articleView.style.display = 'none';
             analyticView.style.display = 'none';
             artisticView.style.display = 'none';
             if (visuelView) visuelView.style.display = 'none';
             document.body.classList.remove('artistic-mode-active', 'visuel-mode-active');
+            if(btnArticle) btnArticle.classList.remove('active');
             btnGraphique.classList.remove('active');
             if(btnCrea) btnCrea.classList.remove('active');
             if(btnVisuel) btnVisuel.classList.remove('active');
         };
+
+        if (btnArticle) {
+            btnArticle.addEventListener('click', () => {
+                resetViews();
+                if(articleView) articleView.style.display = 'flex';
+                btnArticle.classList.add('active');
+                Viz.renderArticleDonuts();
+            });
+        }
 
         if (btnGraphique) {
             btnGraphique.addEventListener('click', () => {
@@ -331,7 +358,7 @@ const App = {
     },
 
     nextSlide() { 
-        const nextIndex = (this.currentSlide + 1) % 5;
+        const nextIndex = (this.currentSlide + 1) % 7;
         
         const overlay = document.getElementById('transition-overlay');
         const title = document.getElementById('transition-title');
@@ -354,7 +381,7 @@ const App = {
     },
 
     prevSlide() {
-        const prevIndex = (this.currentSlide + 4) % 5;
+        const prevIndex = (this.currentSlide + 6) % 7;
         
         const overlay = document.getElementById('transition-overlay');
         const title = document.getElementById('transition-title');
@@ -396,7 +423,18 @@ const App = {
         const stdCard = document.getElementById('std-card'); 
         const tvCard = document.getElementById('tv-card');
         
-        document.getElementById('analysis-overlay').classList.remove('visible'); 
+        // Contextes intégrés sur les pages
+        const overlay = document.getElementById('analysis-overlay');
+        const overlayHeader = document.getElementById('analysis-header');
+        const overlayBody = document.getElementById('analysis-body');
+        const insight = SLIDE_INSIGHTS[index];
+        if (overlay && insight) {
+            overlayHeader.innerHTML = insight.title;
+            overlayBody.innerHTML = insight.text;
+            overlay.classList.add('visible');
+        } else if (overlay) {
+            overlay.classList.remove('visible');
+        }
 
         if (index === 3) { 
             stdCard.style.display = 'none'; 
@@ -415,7 +453,7 @@ const App = {
             metaControls.style.display = 'none';
             filmControls.style.display = 'none';
             sbControls.style.display = 'none';
-        } else if (index === 4) { 
+        } else if (index >= 4) { 
             genericControls.style.display = 'none';
             metaControls.style.display = 'none';
             filmControls.style.display = 'none';
@@ -916,7 +954,7 @@ const App = {
     }
 };
 
-const Viz = {
+var Viz = {
     showTooltip(e, content) { 
         const tt = document.getElementById('viz-tooltip'); 
         tt.innerHTML = content; 
@@ -932,6 +970,75 @@ const Viz = {
     hideTooltip() { 
         const tt = document.getElementById('viz-tooltip'); 
         tt.style.opacity = 0; 
+    },
+
+    renderArticleDonuts() {
+        const container = document.getElementById('d3-circular-charts');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        const data2010 = [{label: 'Femmes', value: 31.6}, {label: 'Hommes', value: 68.4}];
+        const data2019 = [{label: 'Femmes', value: 38.7}, {label: 'Hommes', value: 61.3}];
+
+        const drawDonut = (data, titleText, colorScale) => {
+            const width = 280, height = 280, margin = 20;
+            const radius = Math.min(width, height) / 2 - margin;
+            
+            const div = document.createElement('div');
+            container.appendChild(div);
+            
+            const svg = d3.select(div)
+              .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+              .append("g")
+                .attr("transform", `translate(${width/2},${height/2})`);
+            
+            const pie = d3.pie().value(d => d.value).sort(null);
+            const data_ready = pie(data);
+            const arc = d3.arc().innerRadius(radius * 0.55).outerRadius(radius);
+            
+            svg.selectAll('path')
+              .data(data_ready)
+              .join('path')
+              .attr('d', arc)
+              .attr('fill', d => colorScale(d.data.label))
+              .attr("stroke", "var(--bg-main)")
+              .style("stroke-width", "3px")
+              .style("opacity", 0.9)
+              .style("cursor", "pointer")
+              .on('mouseover', function(event, d) {
+                  d3.select(this).style("opacity", 1).style("stroke-width", "0");
+                  Viz.showTooltip(event, `<strong>${d.data.label}</strong> : ${d.data.value}%`);
+              })
+              .on('mouseout', function() {
+                  d3.select(this).style("opacity", 0.9).style("stroke-width", "3px");
+                  Viz.hideTooltip();
+              });
+              
+            svg.append("text")
+               .attr("text-anchor", "middle")
+               .attr("dy", "-0.2em")
+               .style("font-size", "28px")
+               .style("font-weight", "bold")
+               .style("fill", "var(--text-main)")
+               .text(titleText);
+               
+            svg.append("text")
+               .attr("text-anchor", "middle")
+               .attr("dy", "1.5em")
+               .style("font-size", "14px")
+               .style("fill", "var(--text-main)")
+               .style("opacity", 0.8)
+               .text(`${data[0].value}% de femmes`);
+        };
+        
+        const color = d3.scaleOrdinal()
+          .domain(["Femmes", "Hommes"])
+          .range(["#F44336", "#2196F3"]);
+          
+        drawDonut(data2010, "2010", color);
+        drawDonut(data2019, "2019", color);
     },
 
     renderChord(data) {
@@ -1554,7 +1661,219 @@ const Viz = {
 
     resetView() { App.selectedIds.clear(); this.clearSelectionStyle(); App.updateCard({title:"Vue Globale", desc:"Sélection réinitialisée."}); document.getElementById('reset-container').style.display = 'none'; d3.selectAll("path").style("opacity", null); d3.selectAll(".bubble").style("opacity", null); },
     clearSelectionStyle() { d3.selectAll(".dimmed").classed("dimmed", false); },
-    resetSelection(e) { if(e.target.className.includes && e.target.className.includes('chart-wrapper')) this.resetView(); }
+    resetSelection(e) { if(e.target.className.includes && e.target.className.includes('chart-wrapper')) this.resetView(); },
+
+    renderBarometreStreamgraph(data, containerId) {
+        const container = document.getElementById(containerId);
+        if(!container || !data) return;
+        container.innerHTML = '';
+        
+        const chartData = data.streamgraph;
+        const themes = data.themes;
+        const years = chartData.map(d => d.year);
+        
+        if (chartData.length === 0) return;
+
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        const margin = {top: 20, right: 30, bottom: 30, left: 50};
+
+        const series = d3.stack()
+            .keys(themes)
+            .offset(d3.stackOffsetWiggle)
+            (chartData);
+
+        const svg = d3.select(container).append("svg")
+            .attr("viewBox", [0, 0, width, height])
+            .style("max-width", "100%")
+            .style("height", "auto");
+
+        const x = d3.scaleLinear()
+            .domain(d3.extent(years))
+            .range([margin.left, width - margin.right]);
+
+        const y = d3.scaleLinear()
+            .domain([d3.min(series, d => d3.min(d, d => d[0])), d3.max(series, d => d3.max(d, d => d[1]))])
+            .range([height - margin.bottom, margin.top]);
+
+        const color = d3.scaleOrdinal(CUSTOM_PALETTE).domain(themes);
+
+        const area = d3.area()
+            .x(d => x(d.data.year))
+            .y0(d => y(d[0]))
+            .y1(d => y(d[1]))
+            .curve(d3.curveBasis);
+
+        const tooltip = d3.select(container).append("div")
+            .style("position", "absolute")
+            .style("opacity", 0)
+            .style("background", "var(--bg-card)")
+            .style("border", "1px solid var(--accent-ui)")
+            .style("padding", "10px")
+            .style("border-radius", "8px")
+            .style("color", "var(--text-main)")
+            .style("pointer-events", "none")
+            .style("z-index", 100);
+
+        svg.append("g")
+            .selectAll("path")
+            .data(series)
+            .join("path")
+            .attr("fill", d => color(d.key))
+            .attr("d", area)
+            .style("opacity", 0.9)
+            .on("mouseover", function(event, d) {
+                d3.select(this).style("opacity", 1).style("stroke", "var(--text-main)").style("stroke-width", 1);
+                const coords = d3.pointer(event, container);
+                tooltip.transition().duration(200).style("opacity", 1);
+                tooltip.html(`<strong>${d.key}</strong>`)
+                    .style("left", (coords[0] + 15) + "px")
+                    .style("top", (coords[1] - 28) + "px");
+            })
+            .on("mousemove", function(event) {
+                const coords = d3.pointer(event, container);
+                tooltip.style("left", (coords[0] + 15) + "px")
+                    .style("top", (coords[1] - 28) + "px");
+            })
+            .on("mouseout", function() {
+                d3.select(this).style("opacity", 0.9).style("stroke", "none");
+                tooltip.transition().duration(500).style("opacity", 0);
+            });
+
+        svg.append("g")
+            .attr("transform", `translate(0,${height - margin.bottom})`)
+            .call(d3.axisBottom(x).ticks(width / 80).tickFormat(d3.format("d")))
+            .call(g => g.select(".domain").remove())
+            .call(g => g.selectAll(".tick line").clone()
+                .attr("y2", -height + margin.top + margin.bottom)
+                .attr("stroke-opacity", 0.1))
+            .selectAll("text")
+            .style("fill", "var(--text-main)");
+            
+        svg.append("g")
+            .attr("transform", `translate(${margin.left},0)`)
+            .call(d3.axisLeft(y).ticks(0))
+            .call(g => g.select(".domain").remove());
+    },
+
+    renderBarometreRadialStacked(data, containerId) {
+        const container = document.getElementById(containerId);
+        if(!container || !data) return;
+        container.innerHTML = '';
+
+        const chartData = data.radial;
+        const chaines = data.chaines;
+        if (chartData.length === 0) return;
+
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        const innerRadius = 150;
+        const outerRadius = Math.min(width, height) / 2 - 40;
+
+        const svg = d3.select(container).append("svg")
+            .attr("viewBox", [-width / 2, -height / 2, width, height])
+            .attr("width", width)
+            .attr("height", height);
+
+        const x = d3.scaleBand()
+            .domain(chartData.map(d => d.theme))
+            .range([0, 2 * Math.PI])
+            .align(0);
+
+        const yScale = (typeof d3.scaleRadial === 'function') ? d3.scaleRadial() : d3.scaleLinear();
+        const y = yScale
+            .domain([0, d3.max(chartData, d => d.total)])
+            .range([innerRadius, outerRadius]);
+
+        const arc = d3.arc()
+            .innerRadius(d => y(d[0]))
+            .outerRadius(d => y(d[1]))
+            .startAngle(d => x(d.data.theme))
+            .endAngle(d => x(d.data.theme) + x.bandwidth())
+            .padAngle(0.01)
+            .padRadius(innerRadius);
+
+        const series = d3.stack().keys(chaines)(chartData);
+        const color = d3.scaleOrdinal(CUSTOM_PALETTE).domain(chaines);
+
+        const tooltip = d3.select(container).append("div")
+            .style("position", "absolute")
+            .style("opacity", 0)
+            .style("background", "var(--bg-card)")
+            .style("border", "1px solid var(--accent-ui)")
+            .style("padding", "10px")
+            .style("border-radius", "8px")
+            .style("color", "var(--text-main)")
+            .style("pointer-events", "none")
+            .style("z-index", 100);
+
+        svg.append("g")
+            .selectAll("g")
+            .data(series)
+            .join("g")
+            .attr("fill", d => color(d.key))
+            .selectAll("path")
+            .data(d => d.map(item => { item.key = d.key; return item; }))
+            .join("path")
+            .attr("d", arc)
+            .style("stroke", "var(--bg-card)")
+            .style("stroke-width", "1px")
+            .on("mouseover", function(event, d) {
+                d3.selectAll("path").style("opacity", 0.3);
+                d3.select(this).style("opacity", 1);
+                const coords = d3.pointer(event, container);
+                tooltip.transition().duration(200).style("opacity", 1);
+                tooltip.html(`<strong>${d.data.theme}</strong><br>${d.key}: ${(d[1]-d[0]).toFixed(0)} s`)
+                    .style("left", (coords[0] + width/2 + 15) + "px")
+                    .style("top", (coords[1] + height/2 - 28) + "px");
+            })
+            .on("mousemove", function(event) {
+                const coords = d3.pointer(event, container);
+                tooltip.style("left", (coords[0] + width/2 + 15) + "px")
+                    .style("top", (coords[1] + height/2 - 28) + "px");
+            })
+            .on("mouseout", function() {
+                d3.selectAll("path").style("opacity", 1);
+                tooltip.transition().duration(500).style("opacity", 0);
+            });
+
+        const labelGroup = svg.append("g").selectAll("g")
+            .data(chartData)
+            .join("g")
+            .attr("text-anchor", d => (x(d.theme) + x.bandwidth() / 2 + Math.PI / 2) % (2 * Math.PI) < Math.PI ? "start" : "end")
+            .attr("transform", d => `
+                rotate(${((x(d.theme) + x.bandwidth() / 2) * 180 / Math.PI - 90)})
+                translate(${outerRadius + 15},0)
+            `);
+
+        labelGroup.append("text")
+            .attr("transform", d => (x(d.theme) + x.bandwidth() / 2 + Math.PI / 2) % (2 * Math.PI) < Math.PI ? "" : "rotate(180)")
+            .text(d => d.theme.length > 20 ? d.theme.substring(0, 20) + '...' : d.theme)
+            .style("font-size", "11px")
+            .style("fill", "var(--text-main)")
+            .style("font-weight", "600")
+            .style("pointer-events", "none");
+
+        // Legend
+        const legend = svg.append("g")
+            .attr("transform", `translate(-${width/2 - 20}, -${height/2 - 20})`)
+            .selectAll("g")
+            .data(chaines)
+            .join("g")
+            .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+        legend.append("rect")
+            .attr("width", 15)
+            .attr("height", 15)
+            .attr("fill", color);
+
+        legend.append("text")
+            .attr("x", 25)
+            .attr("y", 12)
+            .text(d => d)
+            .style("fill", "var(--text-main)")
+            .style("font-size", "12px");
+    }
 };
 
 App.init();
