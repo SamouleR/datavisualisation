@@ -54,10 +54,21 @@ export default function WorldMap({ selectedCountry = 'all', onCountryClick }) {
       const w = container.clientWidth || 400
       const h = container.clientHeight || 420
 
+      let rotate = [-10, -45]
+      if (selectedCountry !== 'all') {
+        const targetFeature = countries.features.find(f => COUNTRY_FILTER_MAP[String(f.id)] === selectedCountry)
+        if (targetFeature) {
+          const centroid = d3.geoCentroid(targetFeature)
+          if (centroid && centroid.length === 2 && !Number.isNaN(centroid[0]) && !Number.isNaN(centroid[1])) {
+            rotate = [-centroid[0], -centroid[1]]
+          }
+        }
+      }
+
       const projection = d3.geoOrthographic()
         .scale(w / 2.2)
         .translate([w / 2, h / 2])
-        .rotate([-10, -45]) // Center slightly on Europe
+        .rotate(rotate)
 
       const path = d3.geoPath().projection(projection)
 
@@ -210,11 +221,21 @@ export default function WorldMap({ selectedCountry = 'all', onCountryClick }) {
       }}>
         Filtrer par origine
       </div>
+      <div style={{
+        fontSize: '0.85rem',
+        lineHeight: 1.5,
+        color: 'var(--text-main)',
+        opacity: 0.85,
+        textAlign: 'center',
+        marginBottom: '12px',
+      }}>
+        Clique sur un pays pour voir uniquement les films de ce pays dans le graphique radial.
+      </div>
 
       {/* Map SVG container */}
       <div
         ref={svgRef}
-        style={{ width: '100%', flex: 1, minHeight: 0, position: 'relative' }}
+        style={{ width: '100%', flex: 1.3, minHeight: 0, position: 'relative' }}
       />
 
       {/* Tooltip */}

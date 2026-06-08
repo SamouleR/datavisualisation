@@ -34,7 +34,7 @@ var MEDIA_DOMAINS = {
     "France Télévisions": "francetelevisions.fr", "Groupe TF1": "groupe-tf1.fr", 
     "Groupe M6": "groupem6.fr", "Groupe Canal+": "groupe-canal-plus.com", 
     "NextRadioTV": "alticefrance.com", "NRJ Group": "nrjgroup.fr", 
-    "Lagardère Active": "lagardere.com", "Radio France": "radiofrance.com",
+    "Lagardère Active": "lagardere.com",
     "Public Sénat": "publicsenat.fr", "Euronews": "euronews.com",
     "RMC": "rmc.bfmtv.com", "Europe 1": "europe1.fr", "RTL": "rtl.fr",
     "France Inter": "franceinter.fr", "France Culture": "franceculture.fr",
@@ -140,32 +140,6 @@ var App = {
 
         this.initTitleInteractions();
         // this.initSwitches(); // Now handled by React in App.jsx
-
-        // Interactions au survol sur la galerie du mode visuel
-        const compositionEl = document.querySelector('.svg-composition');
-        const galleryItems = document.querySelectorAll('.gallery-item');
-        
-        galleryItems.forEach(item => {
-            const targetClass = item.getAttribute('data-layer');
-            
-            item.addEventListener('mouseenter', () => {
-                const targetLayer = compositionEl ? compositionEl.querySelector(`.${targetClass}`) : null;
-                if (compositionEl && targetLayer) {
-                    compositionEl.classList.add('dimmed-all');
-                    targetLayer.classList.add('highlighted');
-                }
-            });
-            
-            item.addEventListener('mouseleave', () => {
-                const targetLayer = compositionEl ? compositionEl.querySelector(`.${targetClass}`) : null;
-                if (compositionEl && targetLayer) {
-                    compositionEl.classList.remove('dimmed-all');
-                    targetLayer.classList.remove('highlighted');
-                }
-            });
-        });
-
-
 
         try {
             // csvFilmsRaw is a global from films.js, fallbackCovers from covers.js
@@ -274,12 +248,10 @@ var App = {
         const btnArticle = document.getElementById('nav-mode-article');
         const btnGraphique = document.getElementById('nav-mode-graphique');
         const btnCrea = document.getElementById('nav-mode-crea');
-        const btnVisuel = document.getElementById('nav-mode-visuel');
         
         const articleView = document.getElementById('article-view');
         const analyticView = document.getElementById('analytic-view');
         const artisticView = document.getElementById('artistic-view');
-        const visuelView = document.getElementById('visuel-view');
 
         toggleTheme.addEventListener('change', (e) => {
             if(e.target.checked) document.body.classList.add('dark-mode');
@@ -290,12 +262,10 @@ var App = {
             if(articleView) articleView.style.display = 'none';
             analyticView.style.display = 'none';
             artisticView.style.display = 'none';
-            if (visuelView) visuelView.style.display = 'none';
-            document.body.classList.remove('artistic-mode-active', 'visuel-mode-active');
+            document.body.classList.remove('artistic-mode-active');
             if(btnArticle) btnArticle.classList.remove('active');
             btnGraphique.classList.remove('active');
             if(btnCrea) btnCrea.classList.remove('active');
-            if(btnVisuel) btnVisuel.classList.remove('active');
         };
 
         if (btnArticle) {
@@ -321,33 +291,6 @@ var App = {
                 artisticView.style.display = 'flex';
                 document.body.classList.add('artistic-mode-active');
                 btnCrea.classList.add('active');
-            });
-        }
-
-        if (btnVisuel) {
-            btnVisuel.addEventListener('click', () => {
-                resetViews();
-                if(visuelView) visuelView.style.display = 'flex';
-                document.body.classList.add('visuel-mode-active');
-                btnVisuel.classList.add('active');
-                
-                // Redéclencher l'animation en clonant et remplaçant les images
-                const layers = visuelView.querySelectorAll('.layer');
-                layers.forEach(img => {
-                    const newImg = img.cloneNode(true);
-                    img.parentNode.replaceChild(newImg, img);
-                });
-            });
-        }
-
-        const btnReplay = document.getElementById('btn-replay-visuel');
-        if (btnReplay) {
-            btnReplay.addEventListener('click', () => {
-                const layers = document.querySelectorAll('#visuel-view .layer');
-                layers.forEach(img => {
-                    const newImg = img.cloneNode(true);
-                    img.parentNode.replaceChild(newImg, img);
-                });
             });
         }
     },

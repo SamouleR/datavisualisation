@@ -23,6 +23,8 @@ export default function CreativeThreeCanvas() {
         renderer.setSize(width, height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.shadowMap.enabled = true;
+        renderer.setClearColor(0xffffff, 0);
+        currentMount.style.background = '#ffffff';
         currentMount.appendChild(renderer.domElement);
 
         // 4. Lights
@@ -43,7 +45,7 @@ export default function CreativeThreeCanvas() {
         let discMesh;
         let particles;
 
-        textureLoader.load('/svg/Créa1.svg', (texture) => {
+        textureLoader.load('/Datavisualisation final.svg', (texture) => {
             texture.colorSpace = THREE.SRGBColorSpace;
             texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
@@ -108,12 +110,13 @@ export default function CreativeThreeCanvas() {
         window.addEventListener('mousemove', handleMouseMove);
 
         // 8. Animation loop
-        const clock = new THREE.Clock();
+        const timer = new THREE.Timer();
 
-        const animate = () => {
+        const animate = (time) => {
             requestAnimationFrame(animate);
+            timer.update(time);
 
-            const elapsedTime = clock.getElapsedTime();
+            const elapsedTime = timer.getElapsed();
 
             // Rotate disc
             if (discMesh) {

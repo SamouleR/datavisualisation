@@ -8,20 +8,20 @@ export default function ThemeDoubleChart() {
         const d3 = window.d3;
         if (!d3) return;
 
-        d3.csv("/csv/ina-csa-parole-femmes-genreprogramme.csv")
+        d3.csv('/csv/ina-csa-parole-femmes-genreprogramme.csv')
             .then(rawData => {
                 let totalWomen = 0;
                 let totalMen = 0;
-                
+
                 const processed = rawData
-                    .filter(d => d.genre && d.genre.trim() !== "" && d.genre !== "Non Renseigné")
+                    .filter(d => d.genre && d.genre.trim() !== '' && d.genre !== 'Non Renseigné')
                     .map(d => {
                         const women = parseFloat(d.women_speech_duration_2020) || 0;
                         const men = parseFloat(d.men_speech_duration_2020) || 0;
                         const total = women + men;
                         const pctF = total > 0 ? (women / total) * 100 : 0;
                         const pctM = total > 0 ? (men / total) * 100 : 0;
-                        
+
                         totalWomen += women;
                         totalMen += men;
 
@@ -34,7 +34,6 @@ export default function ThemeDoubleChart() {
                             pctM
                         };
                     })
-                    // Sort ascending by pctF so the lowest is at the top, highest at the bottom
                     .sort((a, b) => a.pctF - b.pctF);
 
                 const overallAvg = (totalWomen / (totalWomen + totalMen)) * 100;
@@ -52,164 +51,80 @@ export default function ThemeDoubleChart() {
         );
     }
 
-    const rowHeight = 32;
-    const padding = { top: 40, right: 60, bottom: 40, left: 160 };
+    const rowHeight = 34;
+    const padding = { top: 50, right: 28, bottom: 40, left: 170 };
     const chartHeight = data.length * rowHeight + padding.top + padding.bottom;
-    const chartWidth = 500;
-    
-    // Scale for Left Chart (0% to 50% to make the differences visible)
-    const xLeftMax = 50;
-    const xLeftScale = (val) => {
+    const chartWidth = 540;
+    const barDepth = 10;
+
+    const xLeftScale = val => {
         const availableWidth = chartWidth - padding.left - padding.right;
-        return padding.left + (val / xLeftMax) * availableWidth;
+        return padding.left + (val / 50) * availableWidth;
     };
 
-    // Scale for Right Chart (0% to 100%)
-    const paddingRightChart = { top: 40, right: 20, bottom: 40, left: 20 };
-    const xRightScale = (val) => {
-        const availableWidth = chartWidth - paddingRightChart.left - paddingRightChart.right;
-        return paddingRightChart.left + (val / 100) * availableWidth;
+    const xRightScale = val => {
+        const availableWidth = chartWidth - padding.left - padding.right;
+        return padding.left + (val / 100) * availableWidth;
     };
 
-    const yLeftScale = (index) => {
-        return padding.top + index * rowHeight;
-    };
+    const yScale = index => padding.top + index * rowHeight;
+
+    const colorWomen = '#FF5A5F';
+    const colorMen = '#3B82F6';
 
     return (
-        <div className="double-chart-container" style={{
-            display: 'flex',
-            gap: '24px',
-            width: '100%',
-            height: '100%',
-            overflowY: 'auto',
-            padding: '10px 20px',
-            boxSizing: 'border-box',
-            justifyContent: 'center',
-            alignItems: 'flex-start'
-        }}>
-            {/* Left Card: Part de parole féminine par thème */}
-            <div className="chart-card-glass" style={{
-                flex: '1',
-                maxWidth: '550px',
-                background: 'var(--bg-card)',
-                border: '1px solid var(--accent-ui)',
-                borderRadius: '16px',
-                padding: '24px',
-                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.2)',
-                backdropFilter: 'blur(8px)'
-            }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', color: 'var(--text-main)', fontWeight: '700' }}>
+        <div style={{ display: 'flex', gap: '22px', width: '100%', minHeight: '100%', padding: '20px 16px', boxSizing: 'border-box', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 480px', minWidth: '300px', background: 'rgba(255,255,255,0.86)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '20px', padding: '24px', boxShadow: '0 20px 60px rgba(0,0,0,0.08)' }}>
+                <h3 style={{ margin: '0 0 10px', fontSize: '1.22rem', color: 'var(--text-main)', fontWeight: '800' }}>
                     Part de parole féminine par thème
                 </h3>
-                <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    Ligne pointillée = moyenne ({average.toFixed(1)}%). Bleu = sous la moyenne ({average.toFixed(1)}%). Rouge = supérieur ou égal.
+                <p style={{ margin: '0 0 22px', color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6 }}>
+                    Ce graphique 3D stylisé met en évidence les thèmes où la parole féminine est sous ou au-dessus de la moyenne. Les barres en relief donnent une sensation de profondeur.
                 </p>
                 <div style={{ width: '100%', overflow: 'hidden' }}>
                     <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} width="100%" height="100%">
-                        {/* Grid lines */}
+                        <defs>
+                            <linearGradient id="womenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#FF7A7D" />
+                                <stop offset="100%" stopColor="#D93025" />
+                            </linearGradient>
+                            <linearGradient id="menGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#60A5FA" />
+                                <stop offset="100%" stopColor="#1D4ED8" />
+                            </linearGradient>
+                            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#000" floodOpacity="0.12" />
+                            </filter>
+                        </defs>
+
                         {[10, 20, 30, 40, 50].map(val => {
                             const xPos = xLeftScale(val);
                             return (
                                 <g key={val}>
-                                    <line 
-                                        x1={xPos} 
-                                        y1={padding.top - 10} 
-                                        x2={xPos} 
-                                        y2={chartHeight - padding.bottom} 
-                                        stroke="var(--text-muted)" 
-                                        strokeOpacity="0.1" 
-                                        strokeDasharray="2 2"
-                                    />
-                                    <text 
-                                        x={xPos} 
-                                        y={chartHeight - padding.bottom + 18} 
-                                        textAnchor="middle" 
-                                        fill="var(--text-muted)" 
-                                        fontSize="10px"
-                                        fontWeight="500"
-                                    >
-                                        {val}%
-                                    </text>
+                                    <line x1={xPos} y1={padding.top - 12} x2={xPos} y2={chartHeight - padding.bottom} stroke="var(--text-muted)" strokeOpacity="0.12" strokeDasharray="3 3" />
+                                    <text x={xPos} y={chartHeight - padding.bottom + 20} textAnchor="middle" fill="var(--text-muted)" fontSize="10px" fontWeight="500">{val}%</text>
                                 </g>
                             );
                         })}
 
-                        {/* Average Dotted Line */}
-                        <line 
-                            x1={xLeftScale(average)} 
-                            y1={padding.top - 10} 
-                            x2={xLeftScale(average)} 
-                            y2={chartHeight - padding.bottom} 
-                            stroke="var(--text-muted)" 
-                            strokeWidth="1.5" 
-                            strokeDasharray="4 4"
-                            opacity="0.6"
-                        />
-                        <text 
-                            x={xLeftScale(average)} 
-                            y={padding.top - 18} 
-                            textAnchor="middle" 
-                            fill="var(--text-muted)" 
-                            fontSize="10px"
-                            fontWeight="600"
-                            letterSpacing="0.05em"
-                        >
-                            moy. {average.toFixed(1)}%
-                        </text>
+                        <line x1={xLeftScale(average)} y1={padding.top - 14} x2={xLeftScale(average)} y2={chartHeight - padding.bottom} stroke="var(--text-muted)" strokeWidth="1.4" strokeDasharray="4 4" opacity="0.65" />
+                        <text x={xLeftScale(average)} y={padding.top - 22} textAnchor="middle" fill="var(--text-muted)" fontSize="10px" fontWeight="700">moy. {average.toFixed(1)}%</text>
 
-                        {/* Data Rows */}
                         {data.map((d, i) => {
-                            const yPos = yLeftScale(i);
-                            const barWidth = xLeftScale(d.pctF) - padding.left;
-                            const isAboveAverage = d.pctF >= average;
-                            const barColor = isAboveAverage ? 'var(--col-women, #F44336)' : 'var(--col-men, #2196F3)';
+                            const yPos = yScale(i);
+                            const barWidth = Math.max(0, xLeftScale(Math.min(d.pctF, 50)) - padding.left);
+                            const lightWidth = Math.max(0, barWidth - 8);
+                            const isAbove = d.pctF >= average;
+                            const barColor = isAbove ? 'url(#womenGradient)' : 'url(#menGradient)';
 
                             return (
-                                <g key={d.genre} className="chart-row-group" style={{ cursor: 'pointer' }}>
-                                    {/* Y label */}
-                                    <text 
-                                        x={padding.left - 15} 
-                                        y={yPos + 14} 
-                                        textAnchor="end" 
-                                        fill="var(--text-main)" 
-                                        fontSize="11px" 
-                                        fontWeight="600"
-                                    >
-                                        {d.genre}
-                                    </text>
-                                    
-                                    {/* Bar background path for hover effect */}
-                                    <rect 
-                                        x={padding.left} 
-                                        y={yPos - 2} 
-                                        width={chartWidth - padding.left - padding.right + 20} 
-                                        height={24} 
-                                        fill="transparent"
-                                        rx="4"
-                                        className="row-hover-bg"
-                                    />
-
-                                    {/* Left chart bar */}
-                                    <rect 
-                                        x={padding.left} 
-                                        y={yPos} 
-                                        width={Math.max(0, barWidth)} 
-                                        height={18} 
-                                        fill={barColor} 
-                                        rx="4"
-                                        style={{ transition: 'all 0.3s ease' }}
-                                    />
-                                    
-                                    {/* Value label */}
-                                    <text 
-                                        x={xLeftScale(d.pctF) + 8} 
-                                        y={yPos + 13} 
-                                        fill="var(--text-main)" 
-                                        fontSize="10.5px" 
-                                        fontWeight="700"
-                                    >
-                                        {d.pctF.toFixed(1)}%
-                                    </text>
+                                <g key={d.genre} filter="url(#shadow)">
+                                    <text x={padding.left - 18} y={yPos + 14} textAnchor="end" fill="var(--text-main)" fontSize="11px" fontWeight="700">{d.genre}</text>
+                                    <path d={`M${padding.left},${yPos} h${barWidth} l${barDepth},-${barDepth} h-${barWidth} Z`} fill={barColor} opacity="0.95" />
+                                    <path d={`M${padding.left},${yPos} v-${barDepth} h${barWidth} v${barDepth} Z`} fill="rgba(255,255,255,0.18)" />
+                                    <path d={`M${padding.left + barWidth},${yPos} l${barDepth},-${barDepth} v18 l-${barDepth},${barDepth} Z`} fill="rgba(0,0,0,0.08)" />
+                                    <rect x={padding.left} y={yPos} width={barWidth} height={18} rx="6" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+                                    <text x={padding.left + barWidth + 10} y={yPos + 14} fill="var(--text-main)" fontSize="10.5px" fontWeight="700">{d.pctF.toFixed(1)}%</text>
                                 </g>
                             );
                         })}
@@ -217,102 +132,76 @@ export default function ThemeDoubleChart() {
                 </div>
             </div>
 
-            {/* Right Card: Répartition Femmes / Hommes (100 %) */}
-            <div className="chart-card-glass" style={{
-                flex: '1',
-                maxWidth: '550px',
-                background: 'var(--bg-card)',
-                border: '1px solid var(--accent-ui)',
-                borderRadius: '16px',
-                padding: '24px',
-                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.2)',
-                backdropFilter: 'blur(8px)'
-            }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', color: 'var(--text-main)', fontWeight: '700' }}>
-                    Répartition Femmes / Hommes (100 %)
+            <div style={{ flex: '1 1 480px', minWidth: '300px', background: 'rgba(255,255,255,0.86)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '20px', padding: '24px', boxShadow: '0 20px 60px rgba(0,0,0,0.08)' }}>
+                <h3 style={{ margin: '0 0 10px', fontSize: '1.22rem', color: 'var(--text-main)', fontWeight: '800' }}>
+                    Répartition Femmes / Hommes par thème
                 </h3>
-                <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    Chaque ligne = 100% de la parole. Rouge = femmes, bleu = hommes.
+                <p style={{ margin: '0 0 22px', color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6 }}>
+                    Les barres empilées donnent un effet 3D. Chaque bande représente le pourcentage de parole féminine et masculine pour un thème donné.
                 </p>
                 <div style={{ width: '100%', overflow: 'hidden' }}>
                     <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} width="100%" height="100%">
-                        {/* Grid lines */}
+                        <defs>
+                            <linearGradient id="femaleDepth" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#FF8A8D" />
+                                <stop offset="100%" stopColor="#D6142D" />
+                            </linearGradient>
+                            <linearGradient id="maleDepth" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#7FB8FF" />
+                                <stop offset="100%" stopColor="#1E40AF" />
+                            </linearGradient>
+                            <filter id="shadow2" x="-20%" y="-20%" width="140%" height="140%">
+                                <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#000" floodOpacity="0.12" />
+                            </filter>
+                        </defs>
+
                         {[0, 20, 40, 60, 80, 100].map(val => {
                             const xPos = xRightScale(val);
                             return (
                                 <g key={val}>
-                                    <line 
-                                        x1={xPos} 
-                                        y1={padding.top - 10} 
-                                        x2={xPos} 
-                                        y2={chartHeight - padding.bottom} 
-                                        stroke="var(--text-muted)" 
-                                        strokeOpacity="0.1" 
-                                        strokeDasharray="2 2"
-                                    />
-                                    <text 
-                                        x={xPos} 
-                                        y={chartHeight - padding.bottom + 18} 
-                                        textAnchor="middle" 
-                                        fill="var(--text-muted)" 
-                                        fontSize="10px"
-                                        fontWeight="500"
-                                    >
-                                        {val}%
-                                    </text>
+                                    <line x1={xPos} y1={padding.top - 12} x2={xPos} y2={chartHeight - padding.bottom} stroke="var(--text-muted)" strokeOpacity="0.1" strokeDasharray="3 3" />
+                                    <text x={xPos} y={chartHeight - padding.bottom + 20} textAnchor="middle" fill="var(--text-muted)" fontSize="10px" fontWeight="500">{val}%</text>
                                 </g>
                             );
                         })}
 
-                        {/* Stacked Bars */}
                         {data.map((d, i) => {
-                            const yPos = yLeftScale(i);
-                            const wWomen = xRightScale(d.pctF) - paddingRightChart.left;
-                            const wMen = xRightScale(100) - xRightScale(d.pctF);
+                            const yPos = yScale(i);
+                            const widthFemale = Math.max(0, xRightScale(d.pctF) - padding.left);
+                            const widthMale = Math.max(0, xRightScale(100) - xRightScale(d.pctF));
+                            const femaleX = padding.left;
 
+                            const femaleBarEnd = femaleX + widthFemale;
+                            const maleBarStart = chartWidth - padding.right - widthMale;
                             return (
-                                <g key={d.genre + '-stacked'}>
-                                    {/* Women part */}
-                                    <rect 
-                                        x={paddingRightChart.left} 
-                                        y={yPos} 
-                                        width={Math.max(0, wWomen)} 
-                                        height={18} 
-                                        fill="var(--col-women, #F44336)" 
-                                        rx="4"
-                                    />
-                                    {/* Men part */}
-                                    <rect 
-                                        x={xRightScale(d.pctF)} 
-                                        y={yPos} 
-                                        width={Math.max(0, wMen)} 
-                                        height={18} 
-                                        fill="var(--col-men, #2196F3)" 
-                                        rx="4"
-                                    />
+                                <g key={d.genre + '-stack'} filter="url(#shadow2)">
+                                    <text x={padding.left - 18} y={yPos + 14} textAnchor="end" fill="#1d4ed8" fontSize="11px" fontWeight="700">{d.genre}</text>
+
+                                    <rect x={femaleX} y={yPos} width="0" height={18} rx="6" fill="url(#femaleDepth)" opacity="0.95">
+                                        <animate attributeName="width" from="0" to={widthFemale.toString()} dur="1s" fill="freeze" />
+                                    </rect>
+                                    <path d={`M${femaleX + widthFemale},${yPos} l${barDepth},-${barDepth} v18 l-${barDepth},${barDepth} Z`} fill="rgba(0,0,0,0.08)" />
+
+                                    <rect x={chartWidth - padding.right} y={yPos} width="0" height={18} rx="6" fill="url(#maleDepth)" opacity="0.95">
+                                        <animate attributeName="x" from={(chartWidth - padding.right).toString()} to={maleBarStart.toString()} dur="1s" fill="freeze" />
+                                        <animate attributeName="width" from="0" to={widthMale.toString()} dur="1s" fill="freeze" />
+                                    </rect>
+                                    <path d={`M${chartWidth - padding.right},${yPos} l-${barDepth},-${barDepth} v18 l${barDepth},${barDepth} Z`} fill="rgba(0,0,0,0.08)" />
+
+                                    <text x={femaleX + widthFemale / 2} y={yPos + 14} fill="#1d4ed8" fontSize="10px" fontWeight="700" textAnchor="middle">{d.pctF.toFixed(1)}%</text>
+                                    <text x={maleBarStart + widthMale / 2} y={yPos + 14} fill="#1d4ed8" fontSize="10px" fontWeight="700" textAnchor="middle">{d.pctM.toFixed(1)}%</text>
                                 </g>
                             );
                         })}
                     </svg>
                 </div>
-                {/* Legend at bottom */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: '20px',
-                    marginTop: '10px',
-                    fontSize: '0.9rem',
-                    fontWeight: '600',
-                    color: 'var(--text-main)'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--col-women, #F44336)' }}></span>
-                        Femmes
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--col-men, #2196F3)' }}></span>
-                        Hommes
-                    </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '16px', fontSize: '0.93rem', color: 'var(--text-main)', fontWeight: '700' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '14px', height: '14px', borderRadius: '4px', background: colorWomen }} /> Femmes
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '14px', height: '14px', borderRadius: '4px', background: colorMen }} /> Hommes
+                    </span>
                 </div>
             </div>
         </div>

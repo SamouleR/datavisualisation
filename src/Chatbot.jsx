@@ -93,7 +93,7 @@ export default function Chatbot() {
         {isOpen ? (
           <i className="fas fa-times" style={{ color: '#4E79A7' }}></i>
         ) : (
-          <img src="/svg/mmi_speak.svg" alt="MMI SPEAK" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <i className="fas fa-comments" style={{ color: '#4E79A7' }}></i>
         )}
       </div>
 
