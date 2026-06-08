@@ -97,6 +97,10 @@ const App = {
 
         document.getElementById('btn-prev').addEventListener('click', () => this.prevSlide());
         document.getElementById('btn-next').addEventListener('click', () => this.nextSlide());
+        const chartSelect = document.getElementById('chart-select');
+        if (chartSelect) {
+            chartSelect.addEventListener('change', (e) => this.setSlide(parseInt(e.target.value)));
+        }
         document.getElementById('btn-all').addEventListener('click', () => this.toggleGender('ALL'));
         document.getElementById('btn-h').addEventListener('click', () => this.toggleGender('H'));
         document.getElementById('btn-f').addEventListener('click', () => this.toggleGender('F'));
@@ -374,6 +378,8 @@ const App = {
 
     setSlide(index) {
         this.currentSlide = index; 
+        const chartSelect = document.getElementById('chart-select');
+        if (chartSelect) chartSelect.value = index;
         this.selectedIds.clear(); 
         Viz.clearSelectionStyle(); 
         this.activeFilters.clear(); 
@@ -401,17 +407,16 @@ const App = {
         }
         
         if (index === 2) { 
-            genericControls.style.display = 'none';
-            filmControls.style.display = 'none';
-            sbControls.style.display = 'none';
-            metaControls.style.display = 'block'; 
-            this.initMetaControls(); 
-        } else if (index === 3) { 
             genericControls.style.display = 'none'; 
             metaControls.style.display = 'none';
             filmControls.style.display = 'block';
-        } else if (index === 4) {
+        } else if (index === 3) { 
             genericControls.style.display = 'block';
+            metaControls.style.display = 'none';
+            filmControls.style.display = 'none';
+            sbControls.style.display = 'none';
+        } else if (index === 4) { 
+            genericControls.style.display = 'none';
             metaControls.style.display = 'none';
             filmControls.style.display = 'none';
             sbControls.style.display = 'none';
@@ -425,14 +430,14 @@ const App = {
         this.updateStats([]); 
 
         if (index === 0) {
-            titleEl.innerText = "PARITÉ TEMPS DE PAROLE MÉDIAS"; 
+            titleEl.innerText = ""; 
             filters.style.display = 'flex';
             this.updateCard({title: "Vue d'ensemble", desc: "Temps de parole H/F par groupe média."});
             const groups = this.dataChaines.map(d => d.group); 
             this.renderFilters(groups); 
             this.applyCurrentViewFilters();
         } else if (index === 1) {
-            titleEl.innerText = "HIÉRARCHIE DES MÉDIAS (DÉTAIL)"; 
+            titleEl.innerText = ""; 
             filters.style.display = 'none'; 
             this.updateCard({title: "Hiérarchie", desc: "Cliquez sur les arcs pour zoomer dans les groupes."});
             
@@ -440,43 +445,72 @@ const App = {
             const gContainer = document.getElementById('sunburst-groups'); 
             gContainer.innerHTML = '';
             
-            groups.forEach(g => {
-                const btn = document.createElement('button'); 
-                btn.className = 'retro-btn ' + (this.activeSunburstGroups.has(g) ? 'active' : ''); 
-                btn.innerText = g;
-                btn.onclick = () => { 
-                    if(g === 'Tous') {
-                        this.activeSunburstGroups.clear();
-                        this.activeSunburstGroups.add('Tous');
-                    } else {
-                        if(this.activeSunburstGroups.has('Tous')) this.activeSunburstGroups.delete('Tous');
-                        if(this.activeSunburstGroups.has(g)) this.activeSunburstGroups.delete(g);
-                        else this.activeSunburstGroups.add(g);
-                        if(this.activeSunburstGroups.size === 0) this.activeSunburstGroups.add('Tous');
-                    }
-                    gContainer.querySelectorAll('.retro-btn').forEach(b => {
-                        if(this.activeSunburstGroups.has(b.innerText)) b.classList.add('active');
-                        else b.classList.remove('active');
-                    });
-                    Viz.renderSunburst(this.activeGender, this.activeSunburstGroups); 
+            // 1. Create "Tous" button
+            const btnAll = document.createElement('button');
+            btnAll.className = 'retro-btn ' + (this.activeSunburstGroups.has('Tous') ? 'active' : '');
+            btnAll.setAttribute('data-filter', 'Tous');
+            const spanAll = document.createElement('span');
+            spanAll.innerText = 'Tous';
+            btnAll.appendChild(spanAll);
+            btnAll.onclick = () => {
+                this.activeSunburstGroups.clear();
+                this.activeSunburstGroups.add('Tous');
+                this.updateSunburstFilterButtons();
+                Viz.renderSunburst(this.activeGender, this.activeSunburstGroups);
+            };
+            gContainer.appendChild(btnAll);
+            
+            // 2. Create sub-grid for other groups
+            const grid = document.createElement('div');
+            grid.className = 'filter-grid';
+            
+            // 3. Populate logos
+            groups.filter(g => g !== "Tous").forEach(g => {
+                const btn = document.createElement('button');
+                btn.className = 'retro-btn ' + (this.activeSunburstGroups.has(g) ? 'active' : '');
+                btn.setAttribute('data-filter', g);
+                
+                const logoPath = App.mediaLogos && App.mediaLogos[g] ? App.mediaLogos[g] : null;
+                if (logoPath) {
+                    const img = document.createElement('img');
+                    img.src = logoPath;
+                    img.className = 'filter-logo-img';
+                    img.alt = g;
+                    btn.appendChild(img);
+                } else {
+                    const span = document.createElement('span');
+                    span.innerText = g;
+                    btn.appendChild(span);
+                }
+                
+                btn.onclick = () => {
+                    if (this.activeSunburstGroups.has('Tous')) this.activeSunburstGroups.delete('Tous');
+                    if (this.activeSunburstGroups.has(g)) this.activeSunburstGroups.delete(g);
+                    else this.activeSunburstGroups.add(g);
+                    if (this.activeSunburstGroups.size === 0) this.activeSunburstGroups.add('Tous');
+                    this.updateSunburstFilterButtons();
+                    Viz.renderSunburst(this.activeGender, this.activeSunburstGroups);
                 };
-                gContainer.appendChild(btn);
+                grid.appendChild(btn);
             });
+            gContainer.appendChild(grid);
+            
             Viz.renderSunburst(this.activeGender, this.activeSunburstGroups);
         } else if (index === 2) {
-            titleEl.innerText = "HIERARCHICAL EDGE BUNDLING"; 
-            filters.style.display = 'none'; 
-            this.updateCard({title: "Interconnexions", desc: "Visualisation des liens complexes du réseau."});
-            Viz.renderEdgeBundlingMeta(App.dataMeta); 
-        } else if (index === 3) {
             titleEl.innerText = "FILMS LES PLUS DIFFUSÉS"; 
+            filters.style.display = 'none';
             this.updateCard({title: "Cinéma TV", desc: "Survolez les barres pour voir les détails sur la TV."}); 
             this.filterFilmsData();
-        } else if (index === 4) {
+        } else if (index === 3) {
             titleEl.innerText = "RÉPARTITION PAR GENRE DE PROGRAMME";
             filters.style.display = 'none';
             this.updateCard({title: "Genre de Programme", desc: "Parité hommes/femmes par format d'émission."});
             Viz.renderRadialStacked(App.dataGenres);
+        } else if (index === 4) {
+            titleEl.innerText = "COMPARAISON HOMMES / FEMMES";
+            filters.style.display = 'none';
+            this.updateCard({title: "Parité Globale", desc: "Répartition totale du temps de parole."});
+            Viz.renderGenderChart(this.dataChaines);
         }
         document.getElementById('reset-container').style.display = 'none';
     },
@@ -486,9 +520,13 @@ const App = {
         const container = document.getElementById('filter-list'); 
         container.innerHTML = '';
         
+        // 1. Create "Tous" button
         const btnAll = document.createElement('button'); 
         btnAll.className = 'retro-btn ' + (this.activeFilters.has('Tous') ? 'active' : ''); 
-        btnAll.innerText = 'Tous';
+        btnAll.setAttribute('data-filter', 'Tous');
+        const spanAll = document.createElement('span');
+        spanAll.innerText = 'Tous';
+        btnAll.appendChild(spanAll);
         btnAll.onclick = () => { 
             this.activeFilters.clear(); 
             this.activeFilters.add('Tous'); 
@@ -497,26 +535,47 @@ const App = {
         };
         container.appendChild(btnAll);
         
+        // 2. Create grid container for other logos
+        const grid = document.createElement('div');
+        grid.className = 'filter-grid';
+        
+        // 3. Populate other logos in the grid
         uniqueItems.filter(i => i !== "Tous").forEach(item => {
             const btn = document.createElement('button'); 
             btn.className = 'retro-btn ' + (this.activeFilters.has(item) ? 'active' : ''); 
-            btn.innerText = item;
+            btn.setAttribute('data-filter', item);
+            
+            const logoPath = App.mediaLogos && App.mediaLogos[item] ? App.mediaLogos[item] : null;
+            if (logoPath) {
+                const img = document.createElement('img');
+                img.src = logoPath;
+                img.className = 'filter-logo-img';
+                img.alt = item;
+                btn.appendChild(img);
+            } else {
+                const span = document.createElement('span');
+                span.innerText = item;
+                btn.appendChild(span);
+            }
+            
             btn.onclick = () => { 
-                if(this.activeFilters.has('Tous')) this.activeFilters.delete('Tous'); 
-                if(this.activeFilters.has(item)) this.activeFilters.delete(item); 
+                if (this.activeFilters.has('Tous')) this.activeFilters.delete('Tous'); 
+                if (this.activeFilters.has(item)) this.activeFilters.delete(item); 
                 else this.activeFilters.add(item); 
-                if(this.activeFilters.size === 0) this.activeFilters.add('Tous'); 
+                if (this.activeFilters.size === 0) this.activeFilters.add('Tous'); 
                 this.updateFilterButtons(); 
                 this.applyCurrentViewFilters(); 
             };
-            container.appendChild(btn);
+            grid.appendChild(btn);
         });
+        
+        container.appendChild(grid);
     },
 
     updateFilterButtons() { 
         const btns = document.querySelectorAll('#filter-list .retro-btn'); 
         btns.forEach(b => { 
-            const val = b.innerText; 
+            const val = b.getAttribute('data-filter'); 
             if(this.activeFilters.has(val)) b.classList.add('active'); 
             else b.classList.remove('active'); 
         }); 
@@ -529,6 +588,7 @@ const App = {
                 filteredData = this.dataChaines.filter(d => this.activeFilters.has(d.group)); 
             } 
             Viz.renderChord(filteredData); 
+            this.updateCardForCurrentFilters();
         } 
     },
 
@@ -571,7 +631,11 @@ const App = {
             ['mean', 'med', 'std', 'var', 'max'].forEach(id => {
                 const el = document.getElementById('stat-' + id);
                 if(el) el.innerText = "--";
+                const bar = document.getElementById('stat-bar-' + id);
+                if(bar) bar.style.width = "0%";
             });
+            const hist = document.getElementById('stats-histogram');
+            if(hist) hist.innerHTML = '';
             return; 
         }
 
@@ -586,6 +650,65 @@ const App = {
         document.getElementById('stat-std').innerText = std.toFixed(1);
         document.getElementById('stat-var').innerText = variance.toFixed(1);
         document.getElementById('stat-max').innerText = max.toFixed(0);
+
+        const maxVal = max > 0 ? max : 1;
+        document.getElementById('stat-bar-mean').style.width = Math.min(100, (mean / maxVal) * 100) + "%";
+        document.getElementById('stat-bar-med').style.width = Math.min(100, (median / maxVal) * 100) + "%";
+        document.getElementById('stat-bar-std').style.width = Math.min(100, (std / maxVal) * 100) + "%";
+        document.getElementById('stat-bar-var').style.width = Math.min(100, (variance / (maxVal * maxVal)) * 100) + "%";
+        document.getElementById('stat-bar-max').style.width = "100%";
+
+        this.drawStatsHistogram(numValues);
+    },
+
+    drawStatsHistogram(values) {
+        const container = document.getElementById('stats-histogram');
+        if(!container) return;
+        container.innerHTML = '';
+        if(values.length < 2) return;
+        
+        const width = container.clientWidth || 220;
+        const height = container.clientHeight || 60;
+        
+        const svg = d3.select(container).append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .style("overflow", "visible");
+            
+        const x = d3.scaleLinear()
+            .domain(d3.extent(values))
+            .range([0, width]);
+            
+        const thresholdCount = Math.min(10, Math.max(3, Math.floor(values.length / 3)));
+        const histogram = d3.bin()
+            .domain(x.domain())
+            .thresholds(x.ticks(thresholdCount));
+            
+        const bins = histogram(values);
+        
+        const y = d3.scaleLinear()
+            .domain([0, d3.max(bins, d => d.length)])
+            .range([height, 5]);
+            
+        svg.append("g")
+            .selectAll("rect")
+            .data(bins)
+            .join("rect")
+            .attr("x", d => x(d.x0) + 1)
+            .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+            .attr("y", d => y(d.length))
+            .attr("height", d => height - y(d.length))
+            .attr("fill", "var(--accent-ui)")
+            .attr("opacity", 0.75)
+            .attr("rx", 2);
+            
+        svg.append("line")
+            .attr("x1", 0)
+            .attr("y1", height)
+            .attr("x2", width)
+            .attr("y2", height)
+            .attr("stroke", "var(--text-main)")
+            .attr("stroke-opacity", 0.2);
     },
 
     populateStatsModal() {
@@ -598,12 +721,12 @@ const App = {
         const slideNames = [
             "Parité temps de parole (Chord Diagram)",
             "Hiérarchie des médias (Sunburst)",
-            "Edge Bundling relationnel",
             "Films les plus diffusés (Radial)",
-            "Répartition par genre (Radial Stacked)"
+            "Répartition par genre (Radial Stacked)",
+            "Comparaison Globale (Pie Chart)"
         ];
         const slideName = slideNames[this.currentSlide] || "Visualisation";
-        const isFilms = this.currentSlide === 3;
+        const isFilms = this.currentSlide === 2;
         const unit = isFilms ? "diffusions" : "secondes de temps de parole";
 
         const ctx = document.getElementById('stats-modal-context');
@@ -733,11 +856,63 @@ const App = {
         }
     },
 
+    updateCardForCurrentFilters() {
+        if(this.currentSlide === 0) { 
+            let totalMen = 0;
+            let totalWomen = 0;
+            if(this.activeFilters.has('Tous')) {
+                this.dataChaines.forEach(d => {
+                    totalMen += parseFloat(d.men_speech_duration_2020) || 0;
+                    totalWomen += parseFloat(d.women_speech_duration_2020) || 0;
+                });
+                this.updateCard({
+                    title: "Tous",
+                    desc: "Tous les groupes de médias.",
+                    men: totalMen,
+                    women: totalWomen
+                });
+            } else {
+                const filtered = this.dataChaines.filter(d => this.activeFilters.has(d.group));
+                filtered.forEach(d => {
+                    totalMen += parseFloat(d.men_speech_duration_2020) || 0;
+                    totalWomen += parseFloat(d.women_speech_duration_2020) || 0;
+                });
+                
+                if (this.activeFilters.size === 1) {
+                    const groupName = Array.from(this.activeFilters)[0];
+                    this.updateCard({
+                        title: groupName,
+                        desc: "Groupe de chaînes.",
+                        men: totalMen,
+                        women: totalWomen
+                    });
+                } else {
+                    const groupNames = Array.from(this.activeFilters).join(", ");
+                    this.updateCard({
+                        title: "Sélection filtrée",
+                        desc: `Groupes: ${groupNames}`,
+                        men: totalMen,
+                        women: totalWomen
+                    });
+                }
+            }
+        }
+    },
+
     toggleSelection(id, value, name) { 
         if (this.selectedIds.has(id)) this.selectedIds.delete(id); 
         else this.selectedIds.add(id); 
         document.getElementById('reset-container').style.display = this.selectedIds.size > 0 ? 'block' : 'none'; 
         return this.selectedIds; 
+    },
+
+    updateSunburstFilterButtons() {
+        const btns = document.querySelectorAll('#sunburst-groups .retro-btn');
+        btns.forEach(b => {
+            const val = b.getAttribute('data-filter');
+            if(this.activeSunburstGroups.has(val)) b.classList.add('active');
+            else b.classList.remove('active');
+        });
     }
 };
 
@@ -835,11 +1010,14 @@ const Viz = {
                 this.showTooltip(e, tooltipHtml);
             })
             .on("mousemove", (e) => { this.moveTooltip(e); })
-            .on("mouseout", () => { this.hideTooltip(); svg.selectAll(".chord-ribbon").style("opacity", 0.7).style("stroke", "none"); if(App.selectedIds.size > 0) this.updateVisualsChord(svg); });
+            .on("mouseout", () => { 
+                this.hideTooltip(); 
+                svg.selectAll(".chord-ribbon").style("opacity", 0.7).style("stroke", "none"); 
+                if(App.selectedIds.size > 0) this.updateVisualsChord(svg); 
+                App.updateCardForCurrentFilters();
+            });
 
-        group.append("text").each(d => { d.angle = (d.startAngle + d.endAngle) / 2; }).attr("dy", ".35em").attr("class", "chord-label")
-            .attr("transform", d => `rotate(${(d.angle * 180 / Math.PI - 90)}) translate(${outerR + 10}) ${d.angle > Math.PI ? "rotate(180)" : ""}`)
-            .attr("text-anchor", d => d.angle > Math.PI ? "end" : "start").text(d => entities[d.index]);
+        // labels removed
 
         svg.append("g").selectAll("path").data(chord).join("path").attr("d", ribbon).attr("class", "chord-ribbon")
             .style("fill", d => color(d.source.index)).style("stroke", "none").style("mix-blend-mode", "multiply").style("opacity", 0.7)
@@ -924,11 +1102,38 @@ const Viz = {
                     });
                 }
                 d3.select(e.target).style("opacity", 1);
+                
                 const info = lookup[d.data.name]; 
-                if(info) App.updateCard({title: d.data.name, desc: `Groupe: ${info.group}`, men: info.men, women: info.women}); 
-                else App.updateCard({title: d.data.name, desc: "Groupe de chaînes", logo: null});
+                if(info) {
+                    // Channel (Depth 2)
+                    App.updateCard({title: d.data.name, desc: `Groupe: ${info.group}`, men: info.men, women: info.women}); 
+                } else if(d.depth === 1 && d.children) {
+                    // Group (Depth 1)
+                    let sumM = 0, sumF = 0;
+                    d.children.forEach(c => {
+                        const cInfo = lookup[c.data.name];
+                        if(cInfo) {
+                            sumM += cInfo.men;
+                            sumF += cInfo.women;
+                        }
+                    });
+                    App.updateCard({title: d.data.name, desc: "Groupe de médias", men: sumM, women: sumF});
+                } else {
+                    // Root / Tous (Depth 0)
+                    let sumM = 0, sumF = 0;
+                    Object.values(lookup).forEach(val => {
+                        sumM += val.men;
+                        sumF += val.women;
+                    });
+                    App.updateCard({title: "Tous", desc: "Totalité des médias", men: sumM, women: sumF});
+                }
             })
-            .on("mouseout", () => { document.getElementById('sunburst-breadcrumbs').innerHTML = ""; d3.selectAll(".sunburst-arc").style("opacity", 1); if(App.selectedIds.size > 0) this.updateVisualsSunburst(svg); });
+            .on("mouseout", () => { 
+                document.getElementById('sunburst-breadcrumbs').innerHTML = ""; 
+                d3.selectAll(".sunburst-arc").style("opacity", 1); 
+                if(App.selectedIds.size > 0) this.updateVisualsSunburst(svg); 
+                App.updateCard({title: "Hiérarchie", desc: "Cliquez sur les arcs pour zoomer dans les groupes."});
+            });
         // ── TEXT LABELS INSIDE ARCS ────────────────────────────────────
         const defs = svg.append("defs");
         let labelId = 0;
@@ -953,16 +1158,41 @@ const Viz = {
             const sa    = flip ? d.x1 : d.x0;
             const ea    = flip ? d.x0 : d.x1;
 
+            const name     = d.data.name;
+            const logoPath = App.mediaLogos && App.mediaLogos[name] ? App.mediaLogos[name] : null;
+            
+            let rText = midR;
+            if (d.depth === 1 && logoPath) {
+                rText = midR + 8; // Shift text slightly outwards
+                const imgR = midR - 12; // Image slightly inwards
+                const imgAngle = (d.x0 + d.x1) / 2;
+                const cx = Math.sin(imgAngle) * imgR;
+                const cy = -Math.cos(imgAngle) * imgR;
+                grp.append("image")
+                   .attr("href", logoPath)
+                   .attr("x", cx - 12)
+                   .attr("y", cy - 12)
+                   .attr("width", 24)
+                   .attr("height", 24)
+                   .style("pointer-events", "none");
+            }
+
+            const x0 = Math.sin(sa) * rText;
+            const y0 = -Math.cos(sa) * rText;
+            const x1 = Math.sin(ea) * rText;
+            const y1 = -Math.cos(ea) * rText;
+            const largeArc = Math.abs(ea - sa) > Math.PI ? 1 : 0;
+            const sweep = sa < ea ? 1 : 0;
+            const pathData = `M ${x0} ${y0} A ${rText} ${rText} 0 ${largeArc} ${sweep} ${x1} ${y1}`;
+
             defs.append("path")
                 .attr("id", id)
-                .attr("d", d3.arc().innerRadius(midR).outerRadius(midR)
-                    .startAngle(sa).endAngle(ea)());
+                .attr("d", pathData);
 
             // Truncate name to available space
             const fsize    = d.depth === 1 ? 10 : 8;
-            const cw       = d.depth === 1 ? 7.5 : 6;
-            const maxChars = Math.floor((Math.abs(ea - sa) * midR) / cw);
-            const name     = d.data.name;
+            const cw       = d.depth === 1 ? 6.5 : 5.5;
+            const maxChars = Math.floor((Math.abs(ea - sa) * rText) / cw);
             const label    = name.length > maxChars
                 ? name.substring(0, Math.max(maxChars - 1, 3)) + "…"
                 : name;
@@ -1104,7 +1334,7 @@ const Viz = {
             .attr("text-anchor", d => d.x < Math.PI ? "start" : "end")
             .attr("transform", d => d.x >= Math.PI ? "rotate(180)" : null)
             .text(d => d.data.name)
-            .attr("fill", "#333")
+            .attr("fill", "transparent")
             .style("font-weight", "bold")
             .style("cursor", "pointer")
             .on("mouseover", (event, d) => {
@@ -1118,6 +1348,7 @@ const Viz = {
             .on("mouseout", () => {
                 link.style("stroke-opacity", 0.5)
                     .style("stroke-width", "3px");
+                App.updateCard({title: "Interconnexions", desc: "Visualisation des liens complexes du réseau."});
             });
         
         App.updateStats([]);
@@ -1153,6 +1384,7 @@ const Viz = {
             })
             .on("mouseout", (e) => {
                 d3.select(".center-rank").text("INFO"); d3.select(".center-title").text("Survolez un film"); d3.select(".center-detail").text("Visualisation Interactive"); d3.select(".center-count").text("--"); d3.selectAll(".radial-bar").style("opacity", 1).style("stroke", "none");
+                App.updateCard({title: "Cinéma TV", desc: "Survolez les barres pour voir les détails sur la TV."});
             });
         
         const yAxis = svg.append("g").attr("text-anchor", "middle").style("pointer-events", "none");
@@ -1161,8 +1393,65 @@ const Viz = {
         if(data.length === 0) { svg.append("text").text("Aucun résultat").attr("text-anchor","middle").attr("dy", "0.35em"); }
     },
 
-    renderRadialStacked(data) {
-        const container = document.getElementById('chart-radial-stacked');
+    renderGenderChart(data, containerId = "chart-gender") {
+        const container = document.getElementById(containerId);
+        if(!container) return;
+        container.innerHTML = "";
+        
+        let men = 0, women = 0;
+        data.forEach(d => {
+            men += parseFloat(d.men_speech_duration_2020) || 0;
+            women += parseFloat(d.women_speech_duration_2020) || 0;
+        });
+        
+        if(men === 0 && women === 0) return;
+        
+        const width = container.clientWidth || 300;
+        const height = container.clientHeight || 300;
+        const radius = Math.min(width, height) / 2 - 20;
+        
+        const svg = d3.select(container).append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%")
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .append("g")
+            .attr("transform", `translate(${width/2},${height/2})`);
+            
+        const pie = d3.pie().value(d => d.value).sort(null);
+        const arc = d3.arc().innerRadius(radius * 0.5).outerRadius(radius);
+        
+        const pieData = pie([
+            {key: "H", value: men, color: "#2196F3"},
+            {key: "F", value: women, color: "#F44336"}
+        ]);
+        
+        svg.selectAll("path")
+            .data(pieData)
+            .join("path")
+            .attr("d", arc)
+            .attr("fill", d => d.data.color)
+            .style("stroke", "var(--bg-main)")
+            .style("stroke-width", "2px")
+            .on("mouseover", function(e, d) {
+                d3.select(this).style("opacity", 0.8);
+                App.updateCard({title: d.data.key === "H" ? "Hommes" : "Femmes", desc: `Total: ${(d.data.value/3600).toFixed(0)}h`, men: d.data.key==="H"?1:0, women: d.data.key==="F"?1:0});
+            })
+            .on("mouseout", function() {
+                d3.select(this).style("opacity", 1);
+            });
+            
+        svg.selectAll("text")
+            .data(pieData)
+            .join("text")
+            .attr("transform", d => `translate(${arc.centroid(d)})`)
+            .attr("text-anchor", "middle")
+            .style("fill", "#fff")
+            .style("font-weight", "bold")
+            .text(d => d.data.key + " " + Math.round(d.data.value / (men+women) * 100) + "%");
+    },
+
+    renderRadialStacked(data, containerId = 'chart-radial-stacked') {
+        const container = document.getElementById(containerId);
         if(!container) return;
         container.innerHTML = '';
         
@@ -1258,7 +1547,9 @@ const Viz = {
             .style("font-weight", "600")
             .style("pointer-events", "none");
             
-        App.updateStats(validData.map(d => d.total));
+        if(containerId === 'chart-radial-stacked') {
+            App.updateStats(validData.map(d => d.total));
+        }
     },
 
     resetView() { App.selectedIds.clear(); this.clearSelectionStyle(); App.updateCard({title:"Vue Globale", desc:"Sélection réinitialisée."}); document.getElementById('reset-container').style.display = 'none'; d3.selectAll("path").style("opacity", null); d3.selectAll(".bubble").style("opacity", null); },
