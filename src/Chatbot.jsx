@@ -17,6 +17,7 @@ export default function Chatbot() {
   const contextData = `
     Contexte du projet : Vous êtes un assistant d'analyse de données pour le projet "Les Français face à l'information" (SAE 302).
     Auteurs du projet : Samuel Ralaikoa, Kinaya Zakaria, Dienaba Sow.
+    RÈGLE STRICTE : Sois extrêmement concis. Fais des réponses très courtes (1 à 2 phrases maximum, pas de longs paragraphes ni de listes à puces superflues).
     Voici les enseignements principaux tirés des données CSV du projet :
     1. Parité de la parole : Disparité persistante. La moyenne du temps de parole féminin reste inférieure à 40%. Les chaînes publiques (France TV) montrent une meilleure équité que le privé.
     2. Hiérarchie des médias : Les groupes majeurs (TF1, M6, France TV) dominent. Forte concentration.
@@ -65,7 +66,11 @@ export default function Chatbot() {
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error("Mistral API error:", error);
-      setMessages(prev => [...prev, { role: 'assistant', content: "Désolé, une erreur s'est produite lors de la communication avec l'agent." }]);
+      let errMsg = "Désolé, une erreur s'est produite lors de la communication avec l'agent.";
+      if (error.status === 401 || (error.message && (error.message.includes('401') || error.message.toLowerCase().includes('unauthorized')))) {
+        errMsg = "La clé API Mistral configurée dans le fichier .env est incorrecte ou expirée (Erreur 401 - Non autorisé). Veuillez vérifier votre clé API.";
+      }
+      setMessages(prev => [...prev, { role: 'assistant', content: errMsg }]);
     } finally {
       setIsLoading(false);
     }
@@ -77,14 +82,19 @@ export default function Chatbot() {
         onClick={() => setIsOpen(!isOpen)}
         style={{
           position: 'fixed', bottom: '20px', right: '20px', 
-          backgroundColor: '#4E79A7', color: 'white',
+          backgroundColor: 'white', color: '#4E79A7',
           width: '60px', height: '60px', borderRadius: '50%',
           display: 'flex', justifyContent: 'center', alignItems: 'center',
-          cursor: 'pointer', zIndex: 1000, boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
-          fontSize: '24px'
+          cursor: 'pointer', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          fontSize: '24px', border: '2px solid #4E79A7',
+          overflow: 'hidden', padding: isOpen ? '0' : '6px'
         }}
       >
-        <i className={isOpen ? "fas fa-times" : "fas fa-robot"}></i>
+        {isOpen ? (
+          <i className="fas fa-times" style={{ color: '#4E79A7' }}></i>
+        ) : (
+          <img src="/svg/mmi_speak.svg" alt="MMI SPEAK" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        )}
       </div>
 
       {isOpen && (
