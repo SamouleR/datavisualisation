@@ -58,29 +58,22 @@ var SLIDE_INSIGHTS = [
     },
     {
         title: " Cinéma à la Télévision",
-        text: "L'étude des 50 films les plus diffusés depuis 1950 montre une hégémonie culturelle des comédies populaires françaises des années 60-80 (ex: <span class='analysis-stat-highlight'>Le Capitan</span>, <span class='analysis-stat-highlight'>La Grande Vadrouille</span>). La télévision linéaire capitalise sur ces valeurs sûres en prime-time."
-    },
-    {
-        title: " Répartition des Genres",
-        text: "La répartition des genres télévisuels montre que certains types d'émissions (ex: sport) sont structurellement dominés par la parole masculine."
+        text: "L'étude des 50 films les plus diffusés depuis 1950 montre une hégémonie culturelle des comédies populaires faites des années 60-80 (ex: <span class='analysis-stat-highlight'>Le Capitan</span>, <span class='analysis-stat-highlight'>La Grande Vadrouille</span>). La télévision linéaire capitalise sur ces valeurs sûres en prime-time."
     },
     {
         title: " Évolution Thématique (2000-2020)",
-        text: "Ce Streamgraph, issu du Baromètre de l'INA, montre comment l'agenda médiatique a basculé au fil du temps. On observe des pics correspondant aux grands événements (élections, crises) et l'émergence progressive de l'Environnement et de l'Association/Société."
+        text: "Ce Streamgraph, issu du Baromètre de l'INA, montre comment l'agenda médiatique a basculé au fil du temps. On observe des pics correspondant aux grands événements (élections, crises) et l'émergence progressive de l'Environnement et de l'Association/Société. Malgré cette évolution, la parole des femmes reste sous-représentée dans les sujets majeurs, surtout dans les thèmes politique et sport."
     },
     {
         title: " Spécialisation par Chaîne",
         text: "Le graphique radial révèle la ligne éditoriale de chaque chaîne. Certaines se spécialisent dans le fait divers ou le sport, tandis que d'autres, notamment publiques, gardent une structure plus équilibrée entre Société, International et Culture."
-    },
-    {
-        title: " Thématiques de l'Information",
-        text: "La part de parole féminine par thème montre des disparités flagrantes : le sport reste très masculin, tandis que la musique est plus équilibrée."
     }
 ];
 
 var App = {
-    dataChaines: [], dataGenres: [], dataMeta: [], dataFilms: [], movieCovers: {}, mediaLogos: {},
-    currentSlide: 0, activeGender: 'H', activeSunburstGroups: new Set(['Tous']), selectedIds: new Set(), activeFilters: new Set(['Tous']),
+    dataChaines: [], dataGenres: [], dataMeta: [], dataBarometre: null, dataFilms: [], movieCovers: {}, mediaLogos: {},
+    currentSlide: 0, activeGender: 'H', activeSunburstGroups: new Set(['Tous']), activeSunburstMedia: new Set(['Tous']), selectedIds: new Set(), activeFilters: new Set(['Tous']), streamgraphGender: 'ALL', hiddenStreamgraphThemes: new Set(), filmGenderFilter: 'ALL',
+    filmSort: 'year-desc', filmSecondarySort: 'title-asc', filmTopFilter: 'all', filmSearchQuery: '', lastFilteredFilms: [],
 
     // FONCTION SIMPLIFIEE : CHARGE ET LANCE DIRECTEMENT
     async init() {
@@ -89,6 +82,7 @@ var App = {
         const introStep1 = document.getElementById('intro-step-1');
         const introStep2 = document.getElementById('intro-step-2');
         const introStep3 = document.getElementById('intro-step-3');
+        const introStep4 = document.getElementById('intro-step-4');
         
         if (introScreen) {
             setTimeout(() => {
@@ -100,10 +94,15 @@ var App = {
                     if (introStep3) introStep3.classList.add('active');
                     
                     setTimeout(() => {
-                        introScreen.classList.add('fade-out');
-                    }, 2500);
-                }, 1500);
-            }, 2000);
+                        if (introStep3) introStep3.classList.remove('active');
+                        if (introStep4) introStep4.classList.add('active');
+                        
+                        setTimeout(() => {
+                            introScreen.classList.add('fade-out');
+                        }, 4500);
+                    }, 4000);
+                }, 3000);
+            }, 3000);
         }
 
         if(!document.getElementById('viz-tooltip')) { 
@@ -113,40 +112,116 @@ var App = {
             document.body.appendChild(tt); 
         }
 
-        document.getElementById('btn-prev').addEventListener('click', () => this.prevSlide());
-        document.getElementById('btn-next').addEventListener('click', () => this.nextSlide());
+        const btnPrev = document.getElementById('btn-prev');
+        if (btnPrev) btnPrev.addEventListener('click', () => this.prevSlide());
+        const btnNext = document.getElementById('btn-next');
+        if (btnNext) btnNext.addEventListener('click', () => this.nextSlide());
+
         const chartSelect = document.getElementById('chart-select');
         if (chartSelect) {
             chartSelect.addEventListener('change', (e) => this.setSlide(parseInt(e.target.value)));
         }
-        document.getElementById('btn-all').addEventListener('click', () => this.toggleGender('ALL'));
-        document.getElementById('btn-h').addEventListener('click', () => this.toggleGender('H'));
-        document.getElementById('btn-f').addEventListener('click', () => this.toggleGender('F'));
+        const btnAll = document.getElementById('btn-all');
+        if (btnAll) btnAll.addEventListener('click', () => this.toggleGender('ALL'));
+        const btnH = document.getElementById('btn-h');
+        if (btnH) btnH.addEventListener('click', () => this.toggleGender('H'));
+        const btnF = document.getElementById('btn-f');
+        if (btnF) btnF.addEventListener('click', () => this.toggleGender('F'));
         
-        document.getElementById('country-select').addEventListener('change', () => this.filterFilmsData());
-        document.getElementById('year-min').addEventListener('input', () => this.filterFilmsData());
-        document.getElementById('diff-select').addEventListener('change', () => this.filterFilmsData());
+        const countrySelect = document.getElementById('country-select');
+        if (countrySelect) countrySelect.addEventListener('change', () => this.filterFilmsData());
+        const yearMin = document.getElementById('year-min');
+        if (yearMin) yearMin.addEventListener('input', () => this.filterFilmsData());
+        const diffSelect = document.getElementById('diff-select');
+        if (diffSelect) diffSelect.addEventListener('change', () => this.filterFilmsData());
+        const filmSortSelect = document.getElementById('film-sort-select');
+        if (filmSortSelect) {
+            filmSortSelect.value = this.filmSort || 'year-desc';
+            filmSortSelect.addEventListener('change', (e) => {
+                this.filmSort = e.target.value;
+                // re-render the last filtered list with new sort
+                this.renderFilmsList(this.lastFilteredFilms || []);
+            });
+        }
+        const filmSortSecondary = document.getElementById('film-sort-secondary');
+        if (filmSortSecondary) {
+            filmSortSecondary.value = this.filmSecondarySort || 'title-asc';
+            filmSortSecondary.addEventListener('change', (e) => {
+                this.filmSecondarySort = e.target.value;
+                this.renderFilmsList(this.lastFilteredFilms || []);
+            });
+        }
+        const filmTop = document.getElementById('film-top-select');
+        if (filmTop) {
+            filmTop.value = this.filmTopFilter || 'all';
+            filmTop.addEventListener('change', (e) => {
+                this.filmTopFilter = e.target.value;
+                this.renderFilmsList(this.lastFilteredFilms || []);
+            });
+        }
+        const filmToggleTop = document.getElementById('film-toggle-top');
+        if (filmToggleTop) {
+            filmToggleTop.addEventListener('click', () => {
+                this.filmTopFilter = (this.filmTopFilter === 'all') ? 'top20' : 'all';
+                // sync select
+                const s = document.getElementById('film-top-select'); if (s) s.value = this.filmTopFilter;
+                this.renderFilmsList(this.lastFilteredFilms || []);
+            });
+        }
+        const filmSearch = document.getElementById('film-search');
+        if (filmSearch) {
+            filmSearch.value = this.filmSearchQuery || '';
+            filmSearch.addEventListener('input', (e) => {
+                this.filmSearchQuery = e.target.value || '';
+                this.renderFilmsList(this.lastFilteredFilms || []);
+            });
+        }
+
+        // Film gender filter buttons (left)
+        const filmBtnAll = document.getElementById('film-btn-all');
+        const filmBtnH = document.getElementById('film-btn-h');
+        const filmBtnF = document.getElementById('film-btn-f');
+        if (filmBtnAll) filmBtnAll.addEventListener('click', () => { this.filmGenderFilter = 'ALL'; this.updateFilmGenderButtons(); this.filterFilmsData(); });
+        if (filmBtnH) filmBtnH.addEventListener('click', () => { this.filmGenderFilter = 'H'; this.updateFilmGenderButtons(); this.filterFilmsData(); });
+        if (filmBtnF) filmBtnF.addEventListener('click', () => { this.filmGenderFilter = 'F'; this.updateFilmGenderButtons(); this.filterFilmsData(); });
+
+        // Film gender filter buttons (right panel)
+        const filmRBtnAll = document.getElementById('film-right-btn-all');
+        const filmRBtnH = document.getElementById('film-right-btn-h');
+        const filmRBtnF = document.getElementById('film-right-btn-f');
+        if (filmRBtnAll) filmRBtnAll.addEventListener('click', () => { this.filmGenderFilter = 'ALL'; this.updateFilmGenderButtons(); this.filterFilmsData(); });
+        if (filmRBtnH) filmRBtnH.addEventListener('click', () => { this.filmGenderFilter = 'H'; this.updateFilmGenderButtons(); this.filterFilmsData(); });
+        if (filmRBtnF) filmRBtnF.addEventListener('click', () => { this.filmGenderFilter = 'F'; this.updateFilmGenderButtons(); this.filterFilmsData(); });
         
-        document.getElementById('btn-reset').addEventListener('click', () => Viz.resetView());
-        document.querySelector('.chart-wrapper').addEventListener('click', (e) => Viz.resetSelection(e));
+        const btnReset = document.getElementById('btn-reset');
+        if (btnReset) btnReset.addEventListener('click', () => Viz.resetView());
+        const chartWrapper = document.querySelector('.chart-wrapper');
+        if (chartWrapper) chartWrapper.addEventListener('click', (e) => Viz.resetSelection(e));
         
-        document.getElementById('meta-group-select').addEventListener('change', () => this.filterMetaData());
-        document.getElementById('meta-media-select').addEventListener('change', () => this.filterMetaData());
-        document.getElementById('btn-meta-reset').addEventListener('click', () => {
-            document.getElementById('meta-group-select').value = 'all';
-            document.getElementById('meta-media-select').value = 'all';
-            this.filterMetaData();
-        });
+        const metaGroupSelect = document.getElementById('meta-group-select');
+        if (metaGroupSelect) metaGroupSelect.addEventListener('change', () => this.filterMetaData());
+        const metaMediaSelect = document.getElementById('meta-media-select');
+        if (metaMediaSelect) metaMediaSelect.addEventListener('change', () => this.filterMetaData());
+        const btnMetaReset = document.getElementById('btn-meta-reset');
+        if (btnMetaReset) {
+            btnMetaReset.addEventListener('click', () => {
+                if (metaGroupSelect) metaGroupSelect.value = 'all';
+                if (metaMediaSelect) metaMediaSelect.value = 'all';
+                this.filterMetaData();
+            });
+        }
 
         this.initTitleInteractions();
+        this.updateFilmGenderButtons();
         // this.initSwitches(); // Now handled by React in App.jsx
 
         try {
             // csvFilmsRaw is a global from films.js, fallbackCovers from covers.js
-            const [chaines, genres, meta, covers, logos] = await Promise.all([
+            const [chaines, genres, meta, barometre, covers, logos] = await Promise.all([
                 d3.csv("csv/ina-csa-parole-femmes-chaines.csv").catch(()=>[]),
                 d3.csv("csv/ina-csa-parole-femmes-genreprogramme.csv").catch(()=>[]),
                 d3.csv("csv/6710e8d60f12d58334949614.csv").catch(()=>[]),
+                d3.json("csv/barometre_aggr.json").catch(()=>({})),
                 d3.json("data.json").catch(()=>({})),
                 d3.json("logos.json").catch(()=>({}))
             ]);
@@ -154,6 +229,7 @@ var App = {
             this.dataChaines = chaines.filter(d => d.Editeur); 
             this.dataGenres = genres; 
             this.dataMeta = meta; 
+            this.dataBarometre = barometre || {};
             this.movieCovers = Object.keys(covers).length > 0 ? covers : fallbackCovers;
             this.mediaLogos = logos;
             
@@ -168,6 +244,11 @@ var App = {
             this.dataFilms.forEach(d => { 
                 d.Poster = this.movieCovers[d.Title] || ("https://placehold.co/300x450/5D4037/ffffff?text=" + encodeURIComponent(d.Title.substring(0,25))); 
             });
+
+            // Compute initial summary statistics for the whole project
+            this.computeSummary();
+            // Estimate film gender presence heuristically (adds d.Women fields if detected)
+            this.computeFilmGenderEstimates();
             
 
 
@@ -211,6 +292,77 @@ var App = {
                 mediaSel.appendChild(opt);
             }
         });
+    },
+
+    // Collect media names from available datasets (chaines + meta) to ensure hierarchy includes all
+    computeMediaList() {
+        const set = new Set();
+        if (Array.isArray(this.dataChaines)) this.dataChaines.forEach(d => { if (d && d.Editeur) set.add(d.Editeur); });
+        if (Array.isArray(this.dataMeta)) {
+            this.dataMeta.forEach(row => {
+                Object.values(row).forEach(v => { if (v && typeof v === 'string' && v.length < 80) set.add(v); });
+            });
+        }
+        // also consider logos keys
+        if (this.mediaLogos) Object.keys(this.mediaLogos).forEach(k => set.add(k));
+        return [...set].sort();
+    },
+
+    computeSummary() {
+        const summary = {};
+        // Media stats
+        let totalMen = 0, totalWomen = 0, countMedia = 0;
+        if (Array.isArray(this.dataChaines)) {
+            this.dataChaines.forEach(d => {
+                const m = parseFloat(d.men_speech_duration_2020)||0;
+                const f = parseFloat(d.women_speech_duration_2020)||0;
+                totalMen += m; totalWomen += f; if (m+f>0) countMedia++;
+            });
+        }
+        const total = totalMen + totalWomen || 1;
+        summary.totalHours = Math.round(total);
+        summary.meanFemaleShare = Math.round((totalWomen/total)*100);
+        summary.mediaCount = countMedia;
+
+        // Films stats
+        if (Array.isArray(this.dataFilms) && this.dataFilms.length>0) {
+            const diffs = this.dataFilms.map(f => +f.Diffusions||0).filter(x=>!isNaN(x));
+            const avgDiff = Math.round(diffs.reduce((a,b)=>a+b,0)/(diffs.length||1));
+            summary.films = { count: this.dataFilms.length, avgDiffusions: avgDiff };
+        } else summary.films = { count: 0, avgDiffusions: 0 };
+
+        // Barometre / themes: top 3 themes by aggregate value if available
+        if (this.dataBarometre && Array.isArray(this.dataBarometre.series)) {
+            const themeSums = (this.dataBarometre.series||[]).map(s => ({ name: s.name, total: (s.data||[]).reduce((a,b)=>a+b,0) }));
+            themeSums.sort((a,b)=>b.total-a.total);
+            summary.topThemes = themeSums.slice(0,3).map(t=>t.name);
+        } else summary.topThemes = [];
+
+        // Store on App for Chatbot and UI
+        this.summary = summary;
+        // expose a global quick accessor
+        window.AppSummary = summary;
+        return summary;
+    },
+
+    computeFilmGenderEstimates() {
+        if (!Array.isArray(this.dataFilms) || this.dataFilms.length === 0) return;
+        const femaleNames = new Set(['marie','sophie','anne','julie','laura','isabelle','elise','valerie','aline','colette','coline','celine','claire','sylvie','denise','diane','audrey','emilie','camille']);
+        const normalize = s => (s||'').toString().toLowerCase().replace(/[^a-zà-ÿ\s'-]/g,' ');
+        this.dataFilms.forEach(f => {
+            const title = normalize(f.Title || f.title || '');
+            const director = normalize(f.Director || f.director || '');
+            const tokens = (title + ' ' + director).split(/\s+/).filter(Boolean);
+            let found = false;
+            for (const t of tokens) {
+                if (femaleNames.has(t)) { found = true; break; }
+            }
+            // add a Women numeric field used by the UI filters
+            f.Women = found ? 1 : 0;
+            f.Female = found ? 1 : 0;
+        });
+        // recompute summary to include any film-derived stats if needed
+        this.computeSummary();
     },
 
     filterMetaData() {
@@ -296,7 +448,9 @@ var App = {
     },
 
     nextSlide() { 
-        const nextIndex = (this.currentSlide + 1) % 7;
+        const slides = document.querySelectorAll('.slide');
+        const count = slides.length || 1;
+        const nextIndex = (this.currentSlide + 1) % count;
         
         const overlay = document.getElementById('transition-overlay');
         const title = document.getElementById('transition-title');
@@ -319,7 +473,9 @@ var App = {
     },
 
     prevSlide() {
-        const prevIndex = (this.currentSlide + 6) % 7;
+        const slides = document.querySelectorAll('.slide');
+        const count = slides.length || 1;
+        const prevIndex = (this.currentSlide + count - 1) % count;
         
         const overlay = document.getElementById('transition-overlay');
         const title = document.getElementById('transition-title');
@@ -355,6 +511,8 @@ var App = {
         const titleEl = document.getElementById('main-chart-title'); 
         const sbControls = document.getElementById('sunburst-controls');
         const filters = document.getElementById('filter-list'); 
+        const filterTop = document.getElementById('filter-list-top');
+        const leftPanel = document.querySelector('.left-panel');
         const genericControls = document.getElementById('generic-controls');
         const filmControls = document.getElementById('film-controls'); 
         const metaControls = document.getElementById('meta-controls');
@@ -388,18 +546,27 @@ var App = {
         if (index === 2) { 
             genericControls.style.display = 'none';
             metaControls.style.display = 'none';
-            filmControls.style.display = 'none'; // hidden in left panel, shown in right panel
+            filmControls.style.display = 'flex'; // show film filters/list in left panel
             sbControls.style.display = 'none';
+            if (leftPanel) leftPanel.style.display = 'flex';
+        } else if (index === 1) {
+            genericControls.style.display = 'none';
+            metaControls.style.display = 'none';
+            filmControls.style.display = 'none';
+            sbControls.style.display = 'flex';
+            if (leftPanel) leftPanel.style.display = 'flex';
         } else if (index >= 3) { 
             genericControls.style.display = 'none';
             metaControls.style.display = 'none';
             filmControls.style.display = 'none';
             sbControls.style.display = 'none';
+            if (leftPanel) leftPanel.style.display = 'flex';
         } else { 
             genericControls.style.display = 'block'; 
             metaControls.style.display = 'none';
             filmControls.style.display = 'none'; 
-            sbControls.style.display = (index === 1) ? 'block' : 'none';
+            sbControls.style.display = 'none';
+            if (leftPanel) leftPanel.style.display = 'flex';
         }
         
         this.updateStats([]); 
@@ -407,124 +574,160 @@ var App = {
         if (index === 0) {
             titleEl.innerText = ""; 
             filters.style.display = 'flex';
+            if (filterTop) filterTop.style.display = 'none';
             this.updateCard({title: "Vue d'ensemble", desc: "Temps de parole H/F par groupe média."});
             const groups = this.dataChaines.map(d => d.group); 
             this.renderFilters(groups); 
             this.applyCurrentViewFilters();
+            const chordData = this.activeFilters.has('Tous') ? this.dataChaines : this.dataChaines.filter(d => this.activeFilters.has(d.group));
+            Viz.renderChord(chordData, 'chart-chord-home');
         } else if (index === 1) {
             titleEl.innerText = ""; 
             filters.style.display = 'none'; 
+            if (filterTop) filterTop.style.display = '';
             this.updateCard({title: "Hiérarchie", desc: "Cliquez sur les arcs pour zoomer dans les groupes."});
-            
             const groups = [...new Set(this.dataChaines.map(d => d.group).filter(x=>x))].sort();
-            const gContainer = document.getElementById('sunburst-groups'); 
-            gContainer.innerHTML = '';
-            gContainer.className = 'filter-container-grid-layout';
-
-            // 1. Create Top Row
-            const topRow = document.createElement('div');
-            topRow.className = 'filter-top-row';
-
-            const btnAll = document.createElement('button');
-            btnAll.className = 'filter-top-btn ' + (this.activeSunburstGroups.has('Tous') ? 'active' : '');
-            btnAll.setAttribute('data-filter', 'Tous');
-            btnAll.innerText = 'Tous';
-            btnAll.onclick = () => {
-                this.activeSunburstGroups.clear();
-                this.activeSunburstGroups.add('Tous');
-                this.updateSunburstFilterButtons();
-                Viz.renderSunburst(this.activeGender, this.activeSunburstGroups);
-            };
-
-            const btnReset = document.createElement('button');
-            btnReset.className = 'filter-top-btn secondary';
-            btnReset.innerText = 'Réinitialiser';
-            btnReset.onclick = () => {
-                this.activeSunburstGroups.clear();
-                this.activeSunburstGroups.add('Tous');
-                this.updateSunburstFilterButtons();
-                Viz.renderSunburst(this.activeGender, this.activeSunburstGroups);
-            };
-
-            topRow.appendChild(btnAll);
-            topRow.appendChild(btnReset);
-            gContainer.appendChild(topRow);
-
-            // 2. Create Grid of Cards
-            const grid = document.createElement('div');
-            grid.className = 'filter-grid-cards';
-
-            groups.forEach(g => {
-                const cardContainer = document.createElement('div');
-                cardContainer.className = 'filter-card-container';
-
-                const btn = document.createElement('button');
-                btn.className = 'filter-card-btn ' + (this.activeSunburstGroups.has(g) ? 'active' : '');
-                btn.setAttribute('data-filter', g);
-
-                const logoPath = App.mediaLogos && App.mediaLogos[g] ? App.mediaLogos[g] : null;
-                if (logoPath) {
-                    const img = document.createElement('img');
-                    img.src = logoPath;
-                    img.className = 'filter-card-img';
-                    img.alt = g;
-                    btn.appendChild(img);
-                } else {
-                    const span = document.createElement('span');
-                    span.innerText = g;
-                    btn.appendChild(span);
-                }
-
-                btn.onclick = () => {
-                    if (this.activeSunburstGroups.has('Tous')) this.activeSunburstGroups.delete('Tous');
-                    if (this.activeSunburstGroups.has(g)) this.activeSunburstGroups.delete(g);
-                    else this.activeSunburstGroups.add(g);
-                    if (this.activeSunburstGroups.size === 0) this.activeSunburstGroups.add('Tous');
-                    this.updateSunburstFilterButtons();
-                    Viz.renderSunburst(this.activeGender, this.activeSunburstGroups);
-                };
-
-                const label = document.createElement('div');
-                label.className = 'filter-card-label';
-                label.innerText = g;
-
-                cardContainer.appendChild(btn);
-                cardContainer.appendChild(label);
-                grid.appendChild(cardContainer);
-            });
-
-            gContainer.appendChild(grid);
-            
-            Viz.renderSunburst(this.activeGender, this.activeSunburstGroups);
+            this.renderFilters(groups, 'filter-list-top');
+            this.renderSunburstGroupControls(groups);
+            this.renderHierarchyRightControls(groups);
+            Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
         } else if (index === 2) {
             titleEl.innerText = "FILMS LES PLUS DIFFUSÉS"; 
             filters.style.display = 'none';
             this.updateCard({title: "Cinéma TV", desc: "Survolez les barres pour voir les détails sur la TV."}); 
-            this.filterFilmsData();
+            // Render the radial film chart when activating the films slide
+            try {
+                const filmsToRender = this.lastFilteredFilms && this.lastFilteredFilms.length ? this.lastFilteredFilms : (this.dataFilms || []);
+                Viz.renderRadialFilms(filmsToRender);
+            } catch (e) {
+                console.error('Erreur rendu chart films', e);
+            }
         } else if (index === 3) {
-            titleEl.innerText = "RÉPARTITION PAR GENRE DE PROGRAMME";
-            filters.style.display = 'none';
-            this.updateCard({title: "Genre de Programme", desc: "Parité hommes/femmes par format d'émission."});
-            Viz.renderRadialStacked(App.dataGenres);
-        } else if (index === 4) {
             titleEl.innerText = "ÉVOLUTION THÉMATIQUE (2000-2020)";
             filters.style.display = 'none';
             this.updateCard({title: "Évolution", desc: "Évolution du volume de sujets par thème dans les JT du soir."});
-        } else if (index === 5) {
-            titleEl.innerText = "SPÉCIALISATION PAR CHAÎNE";
-            filters.style.display = 'none';
-            this.updateCard({title: "Spécialisation", desc: "Volume horaire par thème sur chaque chaîne."});
-        } else if (index === 6) {
-            titleEl.innerText = "THÉMATIQUES DE L'INFORMATION";
-            filters.style.display = 'none';
-            this.updateCard({title: "Parité par Thème", desc: "Comparaison de la part de parole féminine et répartition par thématiques."});
+            Viz.renderBarometreStreamgraph(this.dataBarometre, 'chart-streamgraph');
+            this.initStreamgraphControls();
+            // Show right-side legend for streamgraph (hide left legend)
+            const leftLegendEl = document.getElementById('streamgraph-legend-left');
+            if (leftLegendEl) leftLegendEl.style.display = 'none';
+            const rightLegendEl = document.getElementById('streamgraph-legend');
+            if (rightLegendEl) rightLegendEl.style.display = '';
         }
+        // Show right panel only for certain slides (hierarchy and films)
+        const rightPanel = document.getElementById('right-panel-main');
+        if (rightPanel) rightPanel.style.display = (index === 1 || index === 2) ? 'flex' : 'none';
+        const leftLegend = document.getElementById('streamgraph-legend-left');
+        if (leftLegend) leftLegend.style.display = 'none';
+        const rightLegend = document.getElementById('streamgraph-legend');
+        if (rightLegend) rightLegend.style.display = (index === 3) ? '' : 'none';
         document.getElementById('reset-container').style.display = 'none';
     },
 
-    renderFilters(items) {
+    renderHierarchyRightControls(items) {
+        const container = document.getElementById('hierarchy-left-filters') || document.getElementById('hierarchy-right-filters');
+        if (!container) return;
+        container.style.display = '';
+        // Create controls root inside container if not present
+        let controlsRoot = container.querySelector('.hierarchy-controls-root');
+        if (!controlsRoot) {
+            controlsRoot = document.createElement('div');
+            controlsRoot.className = 'hierarchy-controls-root';
+            container.appendChild(controlsRoot);
+        }
+
+        // Create gender buttons row if missing
+        let genderRow = controlsRoot.querySelector('.hierarchy-gender-row');
+        if (!genderRow) {
+            genderRow = document.createElement('div');
+            genderRow.className = 'hierarchy-gender-row';
+            genderRow.style.marginBottom = '8px';
+            const lab = document.createElement('label'); lab.innerText = 'Sexe';
+            genderRow.appendChild(lab);
+            const btnWrap = document.createElement('div'); btnWrap.style.display = 'flex'; btnWrap.style.gap = '8px'; btnWrap.style.marginTop = '6px';
+            const bAll = document.createElement('button'); bAll.className = 'retro-btn'; bAll.id = 'right-btn-all'; bAll.innerText = 'Tous';
+            const bH = document.createElement('button'); bH.className = 'retro-btn'; bH.id = 'right-btn-h'; bH.innerText = 'H';
+            const bF = document.createElement('button'); bF.className = 'retro-btn'; bF.id = 'right-btn-f'; bF.innerText = 'F';
+            btnWrap.appendChild(bAll); btnWrap.appendChild(bH); btnWrap.appendChild(bF);
+            genderRow.appendChild(btnWrap);
+            controlsRoot.appendChild(genderRow);
+        }
+
+        // Create group select if missing
+        let select = controlsRoot.querySelector('#hierarchy-group-select');
+        if (!select) {
+            const wrap = document.createElement('div'); wrap.style.marginBottom = '8px';
+            const lab = document.createElement('label'); lab.innerText = 'Groupe Média'; lab.style.display = 'block';
+            select = document.createElement('select'); select.id = 'hierarchy-group-select'; select.style.width = '100%'; select.style.padding = '8px'; select.style.borderRadius = '6px'; select.style.marginTop = '6px';
+            wrap.appendChild(lab); wrap.appendChild(select); controlsRoot.appendChild(wrap);
+        }
+
+        // populate groups
+        select.innerHTML = '<option value="Tous">Tous</option>';
+        const unique = [...new Set(items.map(x => x ? x.trim() : x))].filter(x => x).sort();
+        unique.forEach(g => {
+            const opt = document.createElement('option'); opt.value = g; opt.innerText = g; select.appendChild(opt);
+        });
+
+        // Wire gender buttons
+        const bAll = controlsRoot.querySelector('#right-btn-all');
+        const bH = controlsRoot.querySelector('#right-btn-h');
+        const bF = controlsRoot.querySelector('#right-btn-f');
+        if (bAll) bAll.onclick = () => { this.toggleGender('ALL'); };
+        if (bH) bH.onclick = () => { this.toggleGender('H'); };
+        if (bF) bF.onclick = () => { this.toggleGender('F'); };
+
+        select.onchange = (e) => {
+            const val = e.target.value;
+            this.activeSunburstGroups.clear();
+            if (val && val !== 'Tous') this.activeSunburstGroups.add(val);
+            else this.activeSunburstGroups.add('Tous');
+            this.updateSunburstFilterButtons();
+            Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+        };
+
+        // Add media select (list of channels) to allow filtering by specific media
+        let mediaSelect = document.getElementById('hierarchy-media-select');
+        if (!mediaSelect) {
+            const div = document.createElement('div');
+            div.style.marginTop = '10px';
+            div.innerHTML = '<label style="display:block; margin-bottom:6px;">Média</label>';
+            mediaSelect = document.createElement('select');
+            mediaSelect.id = 'hierarchy-media-select';
+            mediaSelect.style.width = '100%';
+            mediaSelect.style.padding = '8px';
+            mediaSelect.style.borderRadius = '6px';
+            div.appendChild(mediaSelect);
+            container.appendChild(div);
+        }
+        // populate media select with unique channel names
+        // use computed media list to include names across datasets
+        const medias = this.computeMediaList();
+        mediaSelect.innerHTML = '';
+        const optAll = document.createElement('option'); optAll.value = 'Tous'; optAll.innerText = 'Tous'; mediaSelect.appendChild(optAll);
+        medias.forEach(m => { const o = document.createElement('option'); o.value = m; o.innerText = m; mediaSelect.appendChild(o); });
+
+        mediaSelect.onchange = (e) => {
+            const val = e.target.value;
+            this.activeSunburstMedia.clear();
+            if (val && val !== 'Tous') this.activeSunburstMedia.add(val);
+            else this.activeSunburstMedia.add('Tous');
+            Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+        };
+
+        const resetBtn = document.getElementById('hierarchy-reset');
+        if (resetBtn) resetBtn.onclick = () => {
+            this.activeSunburstGroups.clear(); this.activeSunburstGroups.add('Tous');
+            if (select) select.value = 'Tous';
+            this.updateSunburstFilterButtons();
+            Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+        };
+    },
+
+    renderFilters(items, containerId = 'filter-list') {
         const uniqueItems = [...new Set(items.map(x => x ? x.trim() : x))].filter(x => x).sort(); 
-        const container = document.getElementById('filter-list'); 
+        const container = document.getElementById(containerId);
+        if (!container) return;
         container.innerHTML = '';
         container.className = 'filter-container-grid-layout';
 
@@ -539,8 +742,14 @@ var App = {
         btnAll.onclick = () => {
             this.activeFilters.clear();
             this.activeFilters.add('Tous');
+            this.activeSunburstGroups = new Set(this.activeFilters);
             this.updateFilterButtons();
-            this.applyCurrentViewFilters();
+            this.updateSunburstFilterButtons();
+            if (this.currentSlide === 1) {
+                Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+            } else {
+                this.applyCurrentViewFilters();
+            }
         };
 
         const btnReset = document.createElement('button');
@@ -549,8 +758,14 @@ var App = {
         btnReset.onclick = () => {
             this.activeFilters.clear();
             this.activeFilters.add('Tous');
+            this.activeSunburstGroups = new Set(this.activeFilters);
             this.updateFilterButtons();
-            this.applyCurrentViewFilters();
+            this.updateSunburstFilterButtons();
+            if (this.currentSlide === 1) {
+                Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+            } else {
+                this.applyCurrentViewFilters();
+            }
         };
 
         topRow.appendChild(btnAll);
@@ -581,22 +796,31 @@ var App = {
                 span.innerText = item;
                 btn.appendChild(span);
             }
+            btn.title = item;
 
             btn.onclick = () => {
                 if (this.activeFilters.has('Tous')) this.activeFilters.delete('Tous');
                 if (this.activeFilters.has(item)) this.activeFilters.delete(item);
                 else this.activeFilters.add(item);
                 if (this.activeFilters.size === 0) this.activeFilters.add('Tous');
+                this.activeSunburstGroups = new Set(this.activeFilters);
                 this.updateFilterButtons();
-                this.applyCurrentViewFilters();
+                this.updateSunburstFilterButtons();
+                if (this.currentSlide === 1) {
+                    Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+                } else {
+                    this.applyCurrentViewFilters();
+                }
             };
 
-            const label = document.createElement('div');
-            label.className = 'filter-card-label';
-            label.innerText = item;
+            if (!logoPath) {
+                const label = document.createElement('div');
+                label.className = 'filter-card-label';
+                label.innerText = item;
+                cardContainer.appendChild(label);
+            }
 
             cardContainer.appendChild(btn);
-            cardContainer.appendChild(label);
             grid.appendChild(cardContainer);
         });
 
@@ -604,13 +828,109 @@ var App = {
         this.updateFilterButtons();
     },
 
+    renderSunburstGroupControls(items) {
+        const uniqueItems = [...new Set(items.map(x => x ? x.trim() : x))].filter(x => x).sort();
+        const container = document.getElementById('sunburst-groups');
+        if (!container) return;
+        container.innerHTML = '';
+
+        // Top buttons row: Tous / Réinitialiser
+        const topRow = document.createElement('div');
+        topRow.style.display = 'flex';
+        topRow.style.gap = '6px';
+
+        const btnAll = document.createElement('button');
+        btnAll.className = 'retro-btn';
+        btnAll.setAttribute('data-filter', 'Tous');
+        btnAll.innerText = 'Tous';
+        btnAll.onclick = () => {
+            this.activeSunburstGroups.clear();
+            this.activeSunburstGroups.add('Tous');
+            this.updateSunburstFilterButtons();
+            if (this.currentSlide === 1) Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+        };
+
+        const btnReset = document.createElement('button');
+        btnReset.className = 'retro-btn secondary';
+        btnReset.innerText = 'Réinitialiser';
+        btnReset.onclick = () => {
+            this.activeSunburstGroups.clear();
+            this.activeSunburstGroups.add('Tous');
+            this.updateSunburstFilterButtons();
+            if (this.currentSlide === 1) Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+        };
+
+        topRow.appendChild(btnAll);
+        topRow.appendChild(btnReset);
+        container.appendChild(topRow);
+
+        // Group buttons vertical
+        const list = document.createElement('div');
+        list.style.display = 'flex';
+        list.style.flexDirection = 'column';
+        list.style.gap = '6px';
+        uniqueItems.forEach(item => {
+            const btn = document.createElement('button');
+            btn.className = 'retro-btn';
+            btn.setAttribute('data-filter', item);
+            btn.innerText = item;
+            btn.onclick = () => {
+                if (this.activeSunburstGroups.has('Tous')) this.activeSunburstGroups.delete('Tous');
+                if (this.activeSunburstGroups.has(item)) this.activeSunburstGroups.delete(item);
+                else this.activeSunburstGroups.add(item);
+                if (this.activeSunburstGroups.size === 0) this.activeSunburstGroups.add('Tous');
+                this.updateSunburstFilterButtons();
+                if (this.currentSlide === 1) Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+            };
+            list.appendChild(btn);
+        });
+        container.appendChild(list);
+        this.updateSunburstFilterButtons();
+    },
+
     updateFilterButtons() { 
-        const items = document.querySelectorAll('#filter-list .filter-card-btn, #filter-list .filter-top-btn'); 
+        const items = document.querySelectorAll('#filter-list .filter-card-btn, #filter-list .filter-top-btn, #filter-list-top .filter-card-btn, #filter-list-top .filter-top-btn'); 
         items.forEach(item => { 
             const val = item.getAttribute('data-filter'); 
             if(this.activeFilters.has(val)) item.classList.add('active'); 
             else item.classList.remove('active'); 
         }); 
+    },
+
+    initStreamgraphControls() {
+        const btnAll = document.getElementById('btn-stream-all');
+        const btnH = document.getElementById('btn-stream-h');
+        const btnF = document.getElementById('btn-stream-f');
+        if (btnAll) btnAll.onclick = () => this.setStreamgraphGender('ALL');
+        if (btnH) btnH.onclick = () => this.setStreamgraphGender('H');
+        if (btnF) btnF.onclick = () => this.setStreamgraphGender('F');
+        this.updateStreamgraphControlButtons();
+    },
+
+    setStreamgraphGender(gender) {
+        this.streamgraphGender = gender;
+        this.updateStreamgraphControlButtons();
+        Viz.renderBarometreStreamgraph(this.dataBarometre, 'chart-streamgraph');
+    },
+
+    updateStreamgraphControlButtons() {
+        const buttons = {
+            ALL: document.getElementById('btn-stream-all'),
+            H: document.getElementById('btn-stream-h'),
+            F: document.getElementById('btn-stream-f')
+        };
+        Object.entries(buttons).forEach(([key, button]) => {
+            if (button) button.classList.toggle('active', this.streamgraphGender === key);
+        });
+    },
+
+    toggleStreamgraphTheme(theme) {
+        if (this.hiddenStreamgraphThemes.has(theme)) {
+            this.hiddenStreamgraphThemes.delete(theme);
+        } else {
+            this.hiddenStreamgraphThemes.add(theme);
+        }
+        Viz.renderBarometreStreamgraph(this.dataBarometre, 'chart-streamgraph');
     },
 
     renderSlide0Charts(data) {
@@ -706,7 +1026,20 @@ var App = {
         else if (gender === 'F') document.getElementById('btn-f').classList.add('active'); 
         else document.getElementById('btn-all').classList.add('active');
         
-        if(this.currentSlide === 1) Viz.renderSunburst(gender, this.activeSunburstGroups);
+        if(this.currentSlide === 1) Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
+    },
+
+    updateFilmGenderButtons() {
+        const leftAll = document.getElementById('film-btn-all');
+        const leftH = document.getElementById('film-btn-h');
+        const leftF = document.getElementById('film-btn-f');
+        const rightAll = document.getElementById('film-right-btn-all');
+        const rightH = document.getElementById('film-right-btn-h');
+        const rightF = document.getElementById('film-right-btn-f');
+        [leftAll, leftH, leftF, rightAll, rightH, rightF].forEach(b => { if (b) b.classList.remove('active'); });
+        if (this.filmGenderFilter === 'ALL') { if (leftAll) leftAll.classList.add('active'); if (rightAll) rightAll.classList.add('active'); }
+        else if (this.filmGenderFilter === 'H') { if (leftH) leftH.classList.add('active'); if (rightH) rightH.classList.add('active'); }
+        else if (this.filmGenderFilter === 'F') { if (leftF) leftF.classList.add('active'); if (rightF) rightF.classList.add('active'); }
     },
 
     filterFilmsData() {
@@ -725,12 +1058,142 @@ var App = {
             if(diffYear !== 'all') matchDiff = (d.LastDiffusion === +diffYear);
             return matchCountry && matchYear && matchDiff;
         });
-        Viz.renderRadialFilms(filtered); 
+        // Apply film gender filter if dataset contains gender fields
+        if (this.filmGenderFilter && this.filmGenderFilter !== 'ALL') {
+            const keyWomen = ['Women','women','Female','female','Femme','Femmes'].find(k => this.dataFilms.some(f => f.hasOwnProperty(k)));
+            const keyMen = ['Men','men','Male','male','Homme','Hommes'].find(k => this.dataFilms.some(f => f.hasOwnProperty(k)));
+            if (keyWomen || keyMen) {
+                if (this.filmGenderFilter === 'F' && keyWomen) filtered = filtered.filter(d => +d[keyWomen] > 0);
+                if (this.filmGenderFilter === 'H' && keyMen) filtered = filtered.filter(d => +d[keyMen] > 0);
+            } else {
+                console.warn('Aucun champ H/F détecté dans les données de films — le filtre sexe est inactif.');
+            }
+        }
+        Viz.renderRadialFilms(filtered);
+        this.lastFilteredFilms = filtered;
+        this.renderFilmsList(filtered);
         this.updateStats(filtered.map(d => d.Diffusions));
     },
 
-    updateStats(values) {
-        // Stats removed
+    sortFilms(list) {
+        if (!Array.isArray(list)) return list;
+        const copy = list.slice();
+        const getKey = (code, item) => {
+            if (code.startsWith('year')) return parseInt(item.Year || item.year || 0) || 0;
+            if (code.startsWith('diff')) return parseInt(item.Diffusions || item.DiffusionsCount || 0) || 0;
+            if (code.startsWith('title')) return (item.Title || item.title || '').toString().toLowerCase();
+            return 0;
+        };
+
+        const cmp = (a, b, code) => {
+            const ka = getKey(code, a);
+            const kb = getKey(code, b);
+            if (typeof ka === 'number' && typeof kb === 'number') return ka - kb;
+            if (typeof ka === 'string' && typeof kb === 'string') return ka.localeCompare(kb);
+            return 0;
+        };
+
+        const primary = this.filmSort || 'year-desc';
+        const secondary = this.filmSecondarySort || 'title-asc';
+
+        copy.sort((a,b) => {
+            const pdir = primary.endsWith('-desc') ? -1 : 1;
+            const sdir = secondary.endsWith('-desc') ? -1 : 1;
+            const pres = cmp(a,b, primary.replace(/-(asc|desc)$/, ''));
+            if (pres !== 0) return pres * pdir;
+            const sres = cmp(a,b, secondary.replace(/-(asc|desc)$/, ''));
+            return sres * sdir;
+        });
+        return copy;
+    },
+
+    renderFilmsList(filtered) {
+        const container = document.getElementById('films-list');
+        if (!container) return;
+        container.innerHTML = '';
+        if (!Array.isArray(filtered) || filtered.length === 0) {
+            container.innerHTML = '<div style="opacity:0.7">Aucun film correspondant.</div>';
+            return;
+        }
+        // Apply search filter
+        const search = (this.filmSearchQuery || '').trim().toLowerCase();
+        let working = filtered.filter(f => {
+            if (!search) return true;
+            const title = (f.Title || f.title || '').toString().toLowerCase();
+            return title.includes(search);
+        });
+
+        // Apply top filters
+        if (this.filmTopFilter === 'top20' || this.filmTopFilter === 'top20-women') {
+            const byDiff = (working.slice()).sort((a,b) => (parseInt(b.Diffusions||b.DiffusionsCount||0) - parseInt(a.Diffusions||a.DiffusionsCount||0)));
+            if (this.filmTopFilter === 'top20-women') {
+                const withWomen = byDiff.filter(d => {
+                    // consider a film "with women" if there's a Women or female count field > 0
+                    return (d.Women && +d.Women > 0) || (d.female && +d.female > 0) || (d.Female && +d.Female > 0) || (d.women && +d.women > 0);
+                });
+                working = withWomen.slice(0, 20);
+            } else {
+                working = byDiff.slice(0, 20);
+            }
+        }
+
+        // Apply sorting and limit to first 500 items to avoid huge lists
+        const sorted = this.sortFilms(working);
+        const list = sorted.slice(0, 500);
+                list.forEach(f => {
+                        const item = document.createElement('div');
+                        item.className = 'film-list-item';
+                        item.style.padding = '8px 10px';
+                        item.style.borderBottom = '1px solid rgba(0,0,0,0.04)';
+                        item.style.cursor = 'pointer';
+                        const title = f.Title || f.title || 'Untitled';
+                        const year = f.Year || f.year || '';
+                        const country = f.Country || f.country || '';
+                        const diffs = f.Diffusions || f.DiffusionsCount || f.Diffusions || 0;
+                        const womenCount = f.Women || f.Female || f.women || 0;
+                        const womenLabel = womenCount ? `${womenCount} femmes` : '—';
+                        item.innerHTML = `
+                                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+                                    <div style="flex:1">
+                                        <div style="font-weight:700">${title}</div>
+                                        <div style="font-size:0.9rem;color:var(--text-muted)">${year} · ${country}</div>
+                                    </div>
+                                    <div style="text-align:right;min-width:120px">
+                                        <div style="font-weight:700">${diffs.toLocaleString ? diffs.toLocaleString() : diffs} diffusions</div>
+                                        <div style="font-size:0.85rem;color:var(--text-muted)">${womenLabel}</div>
+                                    </div>
+                                </div>
+                        `;
+                        item.onclick = () => {
+                                App.updateCard({ title, desc: `${year} · ${country}`, Poster: f.Poster || f.poster, men: f.men, women: f.women });
+                                Viz.renderRadialFilms([f]);
+                        };
+                        container.appendChild(item);
+                });
+    },
+
+    updateStats(metrics) {
+        const summary = document.getElementById('chart-average-summary');
+        if (!summary) return;
+
+        if (Array.isArray(metrics)) {
+            const count = metrics.length;
+            const average = count > 0 ? Math.round(metrics.reduce((sum, v) => sum + v, 0) / count) : 0;
+            summary.innerHTML = `<p>Durée moyenne par élément sélectionné : <strong>${average.toLocaleString('fr-FR')} heures</strong>. Ce calcul donne un aperçu de l’échelle des médias retenus.</p>`;
+            return;
+        }
+
+        const { totalMen, totalWomen, meanFemaleShare, meanMediaDuration, topMediaCount } = metrics || {};
+        if (topMediaCount === undefined) {
+            summary.innerHTML = `<p>Aucune donnée de moyenne disponible pour cette vue.</p>`;
+            return;
+        }
+
+        summary.innerHTML = `
+            <p>Pour les ${topMediaCount} médias les plus présents, la part moyenne de temps de parole féminin est de <strong>${meanFemaleShare}%</strong>.</p>
+            <p>La durée moyenne totale par média est de <strong>${meanMediaDuration.toLocaleString('fr-FR')} heures</strong>, ce qui met en évidence un déséquilibre clair entre les sexes.</p>
+            <p>Ce message moyen explique que les femmes restent globalement sous-représentées, même dans les médias dominants.</p>
+        `;
     },
 
     drawStatsHistogram(values) {
@@ -934,8 +1397,8 @@ var Viz = {
         drawDonut(data2019, "2019", color);
     },
 
-    renderChord(data) {
-        const container = document.getElementById('chart-chord'); 
+    renderChord(data, containerId = 'chart-chord') {
+        const container = document.getElementById(containerId); 
         if(!container) return; 
         container.innerHTML = ''; 
         
@@ -959,6 +1422,7 @@ var Viz = {
         const rawDataMap = {};
         
         const statsArray = [];
+        let totalMen = 0, totalWomen = 0;
 
         topData.forEach((d, i) => {
             const idx = i + 2; 
@@ -969,10 +1433,22 @@ var Viz = {
             matrix[1][idx] = f; 
             matrix[idx][1] = f; 
             rawDataMap[idx] = { name: d.Editeur, men: m, women: f, desc: `Catégorie: ${d.group}` };
+            totalMen += m;
+            totalWomen += f;
             statsArray.push(m + f);
         });
         
-        App.updateStats(statsArray);
+        const totalDuration = totalMen + totalWomen || 1;
+        const meanFemaleShare = Math.round((totalWomen / totalDuration) * 100);
+        const meanMediaDuration = Math.round(totalDuration / (topData.length || 1));
+
+        App.updateStats({
+            totalMen,
+            totalWomen,
+            meanFemaleShare,
+            meanMediaDuration,
+            topMediaCount: topData.length
+        });
 
         const chord = d3.chord().padAngle(0.04).sortSubgroups(d3.descending)(matrix);
         const arc = d3.arc().innerRadius(innerR).outerRadius(outerR);
@@ -1059,16 +1535,20 @@ var Viz = {
         svg.selectAll(".chord-ribbon").classed("dimmed", d => !App.selectedIds.has(d.source.index) && !App.selectedIds.has(d.target.index));
     },
 
-    renderSunburst(gender, groupFilter) {
+    renderSunburst(gender, groupFilter, mediaFilter) {
         const container = document.getElementById('chart-sunburst'); 
         if(!container) return; 
         container.innerHTML = '';
         
-        const width = container.clientWidth, height = container.clientHeight, radius = Math.min(width, height) / 2.2;
+        const width = Math.max(320, container.clientWidth);
+        const height = Math.max(320, container.clientHeight);
+        const margin = 10;
+        const radius = Math.min(width, height) / 2 - margin;
         const hierarchy = { name: "TOTAL", children: [] }; const map = new Map(), lookup = {};
         const statsArray = [];
 
         App.dataChaines.forEach(d => {
+            if (mediaFilter && !mediaFilter.has('Tous') && !mediaFilter.has(d.Editeur)) return;
             if(!groupFilter.has('Tous') && !groupFilter.has(d.group)) return;
             const g = d.group || "Autre"; 
             const men = parseFloat(d.men_speech_duration_2020)||0, women = parseFloat(d.women_speech_duration_2020)||0;
@@ -1087,8 +1567,17 @@ var Viz = {
         const root = d3.hierarchy(hierarchy).sum(d => d.value).sort((a,b) => b.value - a.value);
         d3.partition().size([2*Math.PI, radius*radius])(root);
         const arc = d3.arc().startAngle(d => d.x0).endAngle(d => d.x1).innerRadius(d => Math.sqrt(d.y0)).outerRadius(d => Math.sqrt(d.y1));
-        // Zoom in slightly (reduce viewBox size by 10% to make chart 10% bigger)
-        const svg = d3.select(container).append("svg").attr("viewBox", [-width/2.2, -height/2.2, width/1.1, height/1.1]);
+        // Centered viewBox with padding so outer labels/icons are not clipped
+        const pad = Math.max(24, Math.round(radius * 0.08));
+        const vbX = -width/2 - pad;
+        const vbY = -height/2 - pad;
+        const vbW = width + pad * 2;
+        const vbH = height + pad * 2;
+        const svg = d3.select(container).append("svg")
+            .attr("viewBox", [vbX, vbY, vbW, vbH])
+            .attr("preserveAspectRatio", "xMidYMid meet")
+            .style("width", "100%")
+            .style("height", "100%");
 
         // Color scale: one distinct color per group (depth 1)
         const groups = root.children ? root.children.map(d => d.data.name) : [];
@@ -1415,8 +1904,14 @@ var Viz = {
         
         data.sort((a,b) => b.Diffusions - a.Diffusions);
         
-        const width = container.clientWidth, height = container.clientHeight; 
-        const innerRadius = 130, outerRadius = Math.min(width, height) / 2 - 20;
+        const width = container.clientWidth || 720;
+        const height = container.clientHeight || 480;
+        const outerRadius = Math.max(Math.min(width, height) / 2 - 20, 0);
+        const innerRadius = Math.min(130, outerRadius * 0.5);
+        if (outerRadius <= 0) {
+            container.innerHTML = '<div style="padding:16px;color:var(--text-main);">Zone trop petite pour afficher le graphique.</div>';
+            return;
+        }
         
         const svg = d3.select(container).append("svg").attr("width", width).attr("height", height).append("g").attr("transform", `translate(${width / 2},${height / 2})`);
         const x = d3.scaleBand().range([0, 2 * Math.PI]).align(0).domain(data.map(d => d.Title));
@@ -1614,21 +2109,49 @@ var Viz = {
 
     renderBarometreStreamgraph(data, containerId) {
         const container = document.getElementById(containerId);
-        if(!container || !data) return;
+        if(!container || !data || !Array.isArray(data.streamgraph)) return;
         container.innerHTML = '';
-        
-        const chartData = data.streamgraph;
-        const themes = data.themes;
-        const years = chartData.map(d => d.year);
-        
-        if (chartData.length === 0) return;
 
-        const width = container.clientWidth;
-        const height = container.clientHeight;
+        const chartData = data.streamgraph;
+        const themes = data.themes || (chartData.length ? Object.keys(chartData[0]).filter(k => k !== 'year') : []);
+        const summaryEl = document.querySelector('#slide-3 #streamgraph-summary p');
+        const legendEl = document.getElementById('streamgraph-legend');
+
+        if (chartData.length === 0 || themes.length === 0) {
+            if (summaryEl) summaryEl.innerHTML = 'Aucune donnée thématique disponible pour ce streamgraph.';
+            if (legendEl) legendEl.innerHTML = '';
+            return;
+        }
+
+        const visibleThemes = themes.filter(theme => !App.hiddenStreamgraphThemes.has(theme));
+        if (visibleThemes.length === 0) {
+            if (summaryEl) summaryEl.innerHTML = 'Aucun thème sélectionné. Cliquez sur la légende pour réactiver des thèmes.';
+            if (legendEl) {
+                legendEl.innerHTML = '';
+                themes.forEach(theme => {
+                    const button = document.createElement('button');
+                    button.className = 'streamgraph-legend-item inactive';
+                    button.textContent = theme;
+                    button.onclick = () => App.toggleStreamgraphTheme(theme);
+                    legendEl.appendChild(button);
+                });
+            }
+            return;
+        }
+
+        const years = chartData.map(d => d.year);
+        const width = Math.max(container.clientWidth, 720);
+        const height = Math.max(container.clientHeight, 480);
         const margin = {top: 20, right: 30, bottom: 30, left: 50};
 
+        const colorPalettes = {
+            ALL: CUSTOM_PALETTE,
+            H: ["#1D4ED8", "#2563EB", "#3B82F6", "#60A5FA", "#93C5FD", "#BFDBFE", "#DBEAFE"],
+            F: ["#B91C1C", "#DC2626", "#EF4444", "#F97316", "#FB7185", "#FBCFE8", "#FDE8F1"]
+        };
+
         const series = d3.stack()
-            .keys(themes)
+            .keys(visibleThemes)
             .offset(d3.stackOffsetWiggle)
             (chartData);
 
@@ -1642,15 +2165,21 @@ var Viz = {
             .range([margin.left, width - margin.right]);
 
         const y = d3.scaleLinear()
-            .domain([d3.min(series, d => d3.min(d, d => d[0])), d3.max(series, d => d3.max(d, d => d[1]))])
+            .domain([d3.min(series, d => d3.min(d, dd => dd[0])), d3.max(series, d => d3.max(d, dd => dd[1]))])
             .range([height - margin.bottom, margin.top]);
 
-        const color = d3.scaleOrdinal(CUSTOM_PALETTE).domain(themes);
+        const color = d3.scaleOrdinal(colorPalettes[App.streamgraphGender] || CUSTOM_PALETTE).domain(visibleThemes);
 
         const area = d3.area()
             .x(d => x(d.data.year))
             .y0(d => y(d[0]))
             .y1(d => y(d[1]))
+            .curve(d3.curveBasis);
+
+        const baseline = d3.area()
+            .x(d => x(d.data.year))
+            .y0(() => height - margin.bottom)
+            .y1(() => height - margin.bottom)
             .curve(d3.curveBasis);
 
         const tooltip = d3.select(container).append("div")
@@ -1664,30 +2193,40 @@ var Viz = {
             .style("pointer-events", "none")
             .style("z-index", 100);
 
-        svg.append("g")
+        const paths = svg.append("g")
             .selectAll("path")
             .data(series)
             .join("path")
             .attr("fill", d => color(d.key))
-            .attr("d", area)
-            .style("opacity", 0.9)
+            .attr("d", baseline)
+            .style("opacity", 0.85)
+            .style("stroke", "var(--bg-color)")
+            .style("stroke-width", 0.4)
             .on("mouseover", function(event, d) {
                 d3.select(this).style("opacity", 1).style("stroke", "var(--text-main)").style("stroke-width", 1);
                 const coords = d3.pointer(event, container);
                 tooltip.transition().duration(200).style("opacity", 1);
-                tooltip.html(`<strong>${d.key}</strong>`)
-                    .style("left", (coords[0] + 15) + "px")
-                    .style("top", (coords[1] - 28) + "px");
+                const total = d3.sum(d, dd => dd[1] - dd[0]);
+                tooltip.html(`<strong>${d.key}</strong><br>${d3.format(",")(total)} sujets cumulés`)
+                    .style("left", `${coords[0] + 15}px`)
+                    .style("top", `${coords[1] - 28}px`);
             })
             .on("mousemove", function(event) {
                 const coords = d3.pointer(event, container);
-                tooltip.style("left", (coords[0] + 15) + "px")
-                    .style("top", (coords[1] - 28) + "px");
+                tooltip.style("left", `${coords[0] + 15}px`)
+                    .style("top", `${coords[1] - 28}px`);
             })
             .on("mouseout", function() {
-                d3.select(this).style("opacity", 0.9).style("stroke", "none");
-                tooltip.transition().duration(500).style("opacity", 0);
+                d3.select(this).style("opacity", 0.85).style("stroke", "var(--bg-color)").style("stroke-width", 0.4);
+                tooltip.transition().duration(300).style("opacity", 0);
             });
+
+        paths.transition()
+            .delay((d, i) => i * 60)
+            .duration(1200)
+            .ease(d3.easeCubicOut)
+            .attr("d", area)
+            .style("opacity", 0.95);
 
         svg.append("g")
             .attr("transform", `translate(0,${height - margin.bottom})`)
@@ -1695,7 +2234,7 @@ var Viz = {
             .call(g => g.select(".domain").remove())
             .call(g => g.selectAll(".tick line").clone()
                 .attr("y2", -height + margin.top + margin.bottom)
-                .attr("stroke-opacity", 0.1))
+                .attr("stroke-opacity", 0.08))
             .selectAll("text")
             .style("fill", "var(--text-main)");
             
@@ -1703,6 +2242,59 @@ var Viz = {
             .attr("transform", `translate(${margin.left},0)`)
             .call(d3.axisLeft(y).ticks(0))
             .call(g => g.select(".domain").remove());
+
+        const totals = themes.map(theme => {
+            const total = d3.sum(chartData, row => +row[theme] || 0);
+            return {
+                theme,
+                total,
+                first: +chartData[0][theme] || 0,
+                last: +chartData[chartData.length - 1][theme] || 0
+            };
+        });
+
+        const totalSum = d3.sum(totals, d => d.total);
+        const sorted = totals.slice().sort((a, b) => b.total - a.total);
+        const topThemes = sorted.slice(0, 3).map(d => d.theme).join(', ');
+        const topShare = totalSum ? Math.round((sorted[0].total / totalSum) * 100) : 0;
+
+        const trend = totals.map(d => ({
+            theme: d.theme,
+            delta: d.last - d.first
+        }));
+        const biggestRise = trend.reduce((best, current) => current.delta > best.delta ? current : best, trend[0]);
+        const biggestDrop = trend.reduce((best, current) => current.delta < best.delta ? current : best, trend[0]);
+
+        if (summaryEl) {
+            summaryEl.innerHTML = `Le streamgraph montre l’évolution de ${themes.length} thèmes entre ${years[0]} et ${years[years.length - 1]}. ${topThemes} dominent la couverture et constituent ${topShare}% du volume total. Entre les deux extrêmes, <strong>${biggestRise.theme}</strong> a gagné ${d3.format(",")(biggestRise.delta)} unités tandis que <strong>${biggestDrop.theme}</strong> a perdu ${d3.format(",")(Math.abs(biggestDrop.delta))} unités.`;
+        }
+
+        if (legendEl) {
+            legendEl.innerHTML = '';
+            themes.forEach(theme => {
+                const visible = !App.hiddenStreamgraphThemes.has(theme);
+                const button = document.createElement('button');
+                button.className = `streamgraph-legend-item ${visible ? 'active' : 'inactive'}`;
+                button.innerHTML = `<span class="legend-dot" style="background:${color(theme)}"></span><span>${theme}</span>`;
+                button.onclick = () => App.toggleStreamgraphTheme(theme);
+                legendEl.appendChild(button);
+            });
+            // Also populate left-panel legend if present
+            const leftLegend = document.getElementById('streamgraph-legend-left-inner');
+            if (leftLegend) {
+                leftLegend.innerHTML = '';
+                themes.forEach(theme => {
+                    const visible = !App.hiddenStreamgraphThemes.has(theme);
+                    const button = document.createElement('button');
+                    button.className = `streamgraph-legend-item ${visible ? 'active' : 'inactive'}`;
+                    button.innerHTML = `<span class="legend-dot" style="background:${color(theme)}"></span><span>${theme}</span>`;
+                    button.onclick = () => App.toggleStreamgraphTheme(theme);
+                    leftLegend.appendChild(button);
+                });
+            }
+        }
+
+        App.updateStreamgraphControlButtons();
     },
 
     renderBarometreRadialStacked(data, containerId) {

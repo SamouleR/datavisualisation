@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import * as d3 from 'd3';
 
 // Map from ISO numeric to our filter codes
 // FR=250, US=840, IT=380, GB=826, DE=276, ES=724
@@ -36,9 +37,6 @@ export default function WorldMap({ selectedCountry = 'all', onCountryClick }) {
     let cancelled = false
 
     async function drawMap() {
-      const d3 = window.d3
-      if (!d3) { setTimeout(drawMap, 300); return }
-
       const world = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r => r.json())
       if (cancelled) return
 

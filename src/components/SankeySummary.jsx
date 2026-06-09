@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
 
 const pageNames = [
     'Parité',
@@ -35,9 +37,6 @@ export default function SankeySummary({ activeIndex }) {
         const container = containerRef.current;
         if (!container) return;
 
-        const d3 = window.d3;
-        if (!d3 || typeof d3.sankey !== 'function') return;
-
         container.innerHTML = '';
 
         const width = container.clientWidth || 900;
@@ -62,7 +61,7 @@ export default function SankeySummary({ activeIndex }) {
             ]
         };
 
-        const sankeyGenerator = d3.sankey()
+        const sankeyGenerator = sankey()
             .nodeWidth(20)
             .nodePadding(18)
             .extent([[20, 20], [width - 20, height - 20]]);
@@ -78,7 +77,7 @@ export default function SankeySummary({ activeIndex }) {
             .selectAll('path')
             .data(sankeyData.links)
             .join('path')
-            .attr('d', d3.sankeyLinkHorizontal())
+            .attr('d', sankeyLinkHorizontal())
             .attr('stroke', '#60a5fa')
             .attr('stroke-width', d => Math.max(1, d.width))
             .style('mix-blend-mode', 'multiply');

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import * as d3 from 'd3';
 
 export default function BarometreRadial({ data }) {
     const containerRef = useRef(null);
@@ -8,7 +9,6 @@ export default function BarometreRadial({ data }) {
         if (!container || !data || !data.radial || data.radial.length === 0) return;
         
         container.innerHTML = '';
-        const d3 = window.d3;
         
         const chartData = data.radial;
         const chaines = data.chaines;

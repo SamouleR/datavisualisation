@@ -61,10 +61,6 @@ var SLIDE_INSIGHTS = [
         text: "L'étude des 50 films les plus diffusés depuis 1950 montre une hégémonie culturelle des comédies populaires françaises des années 60-80 (ex: <span class='analysis-stat-highlight'>Le Capitan</span>, <span class='analysis-stat-highlight'>La Grande Vadrouille</span>). La télévision linéaire capitalise sur ces valeurs sûres en prime-time."
     },
     {
-        title: " Répartition des Genres",
-        text: "La répartition des genres télévisuels montre que certains types d'émissions (ex: sport) sont structurellement dominés par la parole masculine."
-    },
-    {
         title: " Évolution Thématique (2000-2020)",
         text: "Ce Streamgraph, issu du Baromètre de l'INA, montre comment l'agenda médiatique a basculé au fil du temps. On observe des pics correspondant aux grands événements (élections, crises) et l'émergence progressive de l'Environnement et de l'Association/Société."
     },
@@ -73,14 +69,14 @@ var SLIDE_INSIGHTS = [
         text: "Le graphique radial révèle la ligne éditoriale de chaque chaîne. Certaines se spécialisent dans le fait divers ou le sport, tandis que d'autres, notamment publiques, gardent une structure plus équilibrée entre Société, International et Culture."
     },
     {
-        title: " Thématiques de l'Information",
-        text: "La part de parole féminine par thème montre des disparités flagrantes : le sport reste très masculin, tandis que la musique est plus équilibrée."
+        title: " Infos",
+        text: "Cette page rassemble les points clés à retenir de l'analyse : déséquilibres H/F, tendances thématiques et pistes pour mieux comprendre l'évolution des médias."
     }
 ];
 
 var App = {
     dataChaines: [], dataGenres: [], dataMeta: [], dataFilms: [], movieCovers: {}, mediaLogos: {},
-    currentSlide: 0, activeGender: 'H', activeSunburstGroups: new Set(['Tous']), selectedIds: new Set(), activeFilters: new Set(['Tous']),
+    currentSlide: 0, activeGender: 'H', activeSunburstGroups: new Set(['Tous']), selectedIds: new Set(), activeFilters: new Set(['Tous']), streamgraphGender: 'ALL', hiddenStreamgraphThemes: new Set(),
 
     // FONCTION SIMPLIFIEE : CHARGE ET LANCE DIRECTEMENT
     async init() {
@@ -324,12 +320,16 @@ var App = {
     },
 
     nextSlide() {
-        const nextIndex = (this.currentSlide + 1) % 7;
+        const slides = document.querySelectorAll('.slide');
+        const count = slides.length || 1;
+        const nextIndex = (this.currentSlide + 1) % count;
         this.setSlide(nextIndex);
     },
 
     prevSlide() {
-        const prevIndex = (this.currentSlide + 6) % 7;
+        const slides = document.querySelectorAll('.slide');
+        const count = slides.length || 1;
+        const prevIndex = (this.currentSlide + count - 1) % count;
         this.setSlide(prevIndex);
     },
 
@@ -496,22 +496,15 @@ var App = {
             this.updateCard({title: "Cinéma TV", desc: "Survolez les barres pour voir les détails sur la TV."}); 
             this.filterFilmsData();
         } else if (index === 3) {
-            titleEl.innerText = "RÉPARTITION PAR GENRE DE PROGRAMME";
-            filters.style.display = 'none';
-            this.updateCard({title: "Genre de Programme", desc: "Parité hommes/femmes par format d'émission."});
-            Viz.renderRadialStacked(App.dataGenres);
-        } else if (index === 4) {
             titleEl.innerText = "ÉVOLUTION THÉMATIQUE (2000-2020)";
             filters.style.display = 'none';
             this.updateCard({title: "Évolution", desc: "Évolution du volume de sujets par thème dans les JT du soir."});
-        } else if (index === 5) {
-            titleEl.innerText = "SPÉCIALISATION PAR CHAÎNE";
+            Viz.renderBarometreStreamgraph(this.dataBarometre, 'chart-streamgraph');
+            this.initStreamgraphControls();
+        } else if (index === 4) {
+            titleEl.innerText = "INFOS";
             filters.style.display = 'none';
-            this.updateCard({title: "Spécialisation", desc: "Volume horaire par thème sur chaque chaîne."});
-        } else if (index === 6) {
-            titleEl.innerText = "THÉMATIQUES DE L'INFORMATION";
-            filters.style.display = 'none';
-            this.updateCard({title: "Parité par Thème", desc: "Comparaison de la part de parole féminine et répartition par thématiques."});
+            this.updateCard({title: "Infos", desc: "Détails et points clés des analyses publiées."});
         }
         document.getElementById('reset-container').style.display = 'none';
     },
@@ -605,6 +598,42 @@ var App = {
             if(this.activeFilters.has(val)) item.classList.add('active'); 
             else item.classList.remove('active'); 
         }); 
+    },
+
+    initStreamgraphControls() {
+        const btnAll = document.getElementById('btn-stream-all');
+        const btnH = document.getElementById('btn-stream-h');
+        const btnF = document.getElementById('btn-stream-f');
+        if (btnAll) btnAll.onclick = () => this.setStreamgraphGender('ALL');
+        if (btnH) btnH.onclick = () => this.setStreamgraphGender('H');
+        if (btnF) btnF.onclick = () => this.setStreamgraphGender('F');
+        this.updateStreamgraphControlButtons();
+    },
+
+    setStreamgraphGender(gender) {
+        this.streamgraphGender = gender;
+        this.updateStreamgraphControlButtons();
+        Viz.renderBarometreStreamgraph(this.dataBarometre, 'chart-streamgraph');
+    },
+
+    updateStreamgraphControlButtons() {
+        const buttons = {
+            ALL: document.getElementById('btn-stream-all'),
+            H: document.getElementById('btn-stream-h'),
+            F: document.getElementById('btn-stream-f')
+        };
+        Object.entries(buttons).forEach(([key, button]) => {
+            if (button) button.classList.toggle('active', this.streamgraphGender === key);
+        });
+    },
+
+    toggleStreamgraphTheme(theme) {
+        if (this.hiddenStreamgraphThemes.has(theme)) {
+            this.hiddenStreamgraphThemes.delete(theme);
+        } else {
+            this.hiddenStreamgraphThemes.add(theme);
+        }
+        Viz.renderBarometreStreamgraph(this.dataBarometre, 'chart-streamgraph');
     },
 
     renderSlide0Charts(data) {
@@ -1447,8 +1476,14 @@ var Viz = {
         
         data.sort((a,b) => b.Diffusions - a.Diffusions);
         
-        const width = container.clientWidth, height = container.clientHeight; 
-        const innerRadius = 130, outerRadius = Math.min(width, height) / 2 - 20;
+        const width = container.clientWidth || 720;
+        const height = container.clientHeight || 480;
+        const outerRadius = Math.max(Math.min(width, height) / 2 - 20, 0);
+        const innerRadius = Math.min(130, outerRadius * 0.5);
+        if (outerRadius <= 0) {
+            container.innerHTML = '<div style="padding:16px;color:var(--text-main);">Zone trop petite pour afficher le graphique.</div>';
+            return;
+        }
         
         const svg = d3.select(container).append("svg").attr("width", width).attr("height", height).append("g").attr("transform", `translate(${width / 2},${height / 2})`);
         const x = d3.scaleBand().range([0, 2 * Math.PI]).align(0).domain(data.map(d => d.Title));
@@ -1457,7 +1492,7 @@ var Viz = {
         const minDiff = d3.min(data, d => d.Diffusions) || 0;
         const maxDiff = d3.max(data, d => d.Diffusions) || 10;
         
-        const colorScale = d3.scaleSequential(d3.interpolateRgbBasis(["#f59e0b", "#f97316", "#ef4444", "#ec4899", "#d946ef"])).domain([minDiff - 1, maxDiff]); 
+        const colorScale = d3.scaleSequential(d3.interpolateRgbBasis(["#ef4444", "#f59e0b", "#3b82f6"])).domain([minDiff - 1, maxDiff]);
 
         svg.append("g").selectAll("path").data(data).join("path").attr("class", "radial-bar").attr("fill", d => colorScale(d.Diffusions))
             .attr("d", d3.arc().innerRadius(innerRadius).outerRadius(d => y(d.Diffusions)).startAngle(d => x(d.Title)).endAngle(d => x(d.Title) + x.bandwidth()).padAngle(0.02).padRadius(innerRadius))
@@ -1646,21 +1681,49 @@ var Viz = {
 
     renderBarometreStreamgraph(data, containerId) {
         const container = document.getElementById(containerId);
-        if(!container || !data) return;
+        if(!container || !data || !Array.isArray(data.streamgraph)) return;
         container.innerHTML = '';
-        
-        const chartData = data.streamgraph;
-        const themes = data.themes;
-        const years = chartData.map(d => d.year);
-        
-        if (chartData.length === 0) return;
 
-        const width = container.clientWidth;
-        const height = container.clientHeight;
+        const chartData = data.streamgraph;
+        const themes = data.themes || (chartData.length ? Object.keys(chartData[0]).filter(k => k !== 'year') : []);
+        const summaryEl = document.querySelector('#slide-3 #streamgraph-summary p');
+        const legendEl = document.getElementById('streamgraph-legend');
+
+        if (chartData.length === 0 || themes.length === 0) {
+            if (summaryEl) summaryEl.innerHTML = 'Aucune donnée thématique disponible pour ce streamgraph.';
+            if (legendEl) legendEl.innerHTML = '';
+            return;
+        }
+
+        const visibleThemes = themes.filter(theme => !App.hiddenStreamgraphThemes.has(theme));
+        if (visibleThemes.length === 0) {
+            if (summaryEl) summaryEl.innerHTML = 'Aucun thème sélectionné. Cliquez sur la légende pour réactiver des thèmes.';
+            if (legendEl) {
+                legendEl.innerHTML = '';
+                themes.forEach(theme => {
+                    const button = document.createElement('button');
+                    button.className = 'streamgraph-legend-item inactive';
+                    button.textContent = theme;
+                    button.onclick = () => App.toggleStreamgraphTheme(theme);
+                    legendEl.appendChild(button);
+                });
+            }
+            return;
+        }
+
+        const years = chartData.map(d => d.year);
+        const width = Math.max(container.clientWidth, 720);
+        const height = Math.max(container.clientHeight, 480);
         const margin = {top: 20, right: 30, bottom: 30, left: 50};
 
+        const colorPalettes = {
+            ALL: CUSTOM_PALETTE,
+            H: ["#1D4ED8", "#2563EB", "#3B82F6", "#60A5FA", "#93C5FD", "#BFDBFE", "#DBEAFE"],
+            F: ["#B91C1C", "#DC2626", "#EF4444", "#F97316", "#FB7185", "#FBCFE8", "#FDE8F1"]
+        };
+
         const series = d3.stack()
-            .keys(themes)
+            .keys(visibleThemes)
             .offset(d3.stackOffsetWiggle)
             (chartData);
 
@@ -1674,10 +1737,10 @@ var Viz = {
             .range([margin.left, width - margin.right]);
 
         const y = d3.scaleLinear()
-            .domain([d3.min(series, d => d3.min(d, d => d[0])), d3.max(series, d => d3.max(d, d => d[1]))])
+            .domain([d3.min(series, d => d3.min(d, dd => dd[0])), d3.max(series, d => d3.max(d, dd => dd[1]))])
             .range([height - margin.bottom, margin.top]);
 
-        const color = d3.scaleOrdinal(CUSTOM_PALETTE).domain(themes);
+        const color = d3.scaleOrdinal(colorPalettes[App.streamgraphGender] || CUSTOM_PALETTE).domain(visibleThemes);
 
         const area = d3.area()
             .x(d => x(d.data.year))
@@ -1696,30 +1759,40 @@ var Viz = {
             .style("pointer-events", "none")
             .style("z-index", 100);
 
-        svg.append("g")
+        const paths = svg.append("g")
             .selectAll("path")
             .data(series)
             .join("path")
             .attr("fill", d => color(d.key))
             .attr("d", area)
-            .style("opacity", 0.9)
+            .style("opacity", 0.85)
+            .style("stroke", "var(--bg-color)")
+            .style("stroke-width", 0.4)
             .on("mouseover", function(event, d) {
                 d3.select(this).style("opacity", 1).style("stroke", "var(--text-main)").style("stroke-width", 1);
                 const coords = d3.pointer(event, container);
                 tooltip.transition().duration(200).style("opacity", 1);
-                tooltip.html(`<strong>${d.key}</strong>`)
-                    .style("left", (coords[0] + 15) + "px")
-                    .style("top", (coords[1] - 28) + "px");
+                const total = d3.sum(d, dd => dd[1] - dd[0]);
+                tooltip.html(`<strong>${d.key}</strong><br>${d3.format(",")(total)} sujets cumulés`)
+                    .style("left", `${coords[0] + 15}px`)
+                    .style("top", `${coords[1] - 28}px`);
             })
             .on("mousemove", function(event) {
                 const coords = d3.pointer(event, container);
-                tooltip.style("left", (coords[0] + 15) + "px")
-                    .style("top", (coords[1] - 28) + "px");
+                tooltip.style("left", `${coords[0] + 15}px`)
+                    .style("top", `${coords[1] - 28}px`);
             })
             .on("mouseout", function() {
-                d3.select(this).style("opacity", 0.9).style("stroke", "none");
-                tooltip.transition().duration(500).style("opacity", 0);
+                d3.select(this).style("opacity", 0.85).style("stroke", "var(--bg-color)").style("stroke-width", 0.4);
+                tooltip.transition().duration(300).style("opacity", 0);
             });
+
+        paths.transition()
+            .delay((d, i) => i * 60)
+            .duration(1200)
+            .ease(d3.easeCubicOut)
+            .attr("d", area)
+            .style("opacity", 0.95);
 
         svg.append("g")
             .attr("transform", `translate(0,${height - margin.bottom})`)
@@ -1727,7 +1800,7 @@ var Viz = {
             .call(g => g.select(".domain").remove())
             .call(g => g.selectAll(".tick line").clone()
                 .attr("y2", -height + margin.top + margin.bottom)
-                .attr("stroke-opacity", 0.1))
+                .attr("stroke-opacity", 0.08))
             .selectAll("text")
             .style("fill", "var(--text-main)");
             
@@ -1735,6 +1808,46 @@ var Viz = {
             .attr("transform", `translate(${margin.left},0)`)
             .call(d3.axisLeft(y).ticks(0))
             .call(g => g.select(".domain").remove());
+
+        const totals = themes.map(theme => {
+            const total = d3.sum(chartData, row => +row[theme] || 0);
+            return {
+                theme,
+                total,
+                first: +chartData[0][theme] || 0,
+                last: +chartData[chartData.length - 1][theme] || 0
+            };
+        });
+
+        const totalSum = d3.sum(totals, d => d.total);
+        const sorted = totals.slice().sort((a, b) => b.total - a.total);
+        const topThemes = sorted.slice(0, 3).map(d => d.theme).join(', ');
+        const topShare = totalSum ? Math.round((sorted[0].total / totalSum) * 100) : 0;
+
+        const trend = totals.map(d => ({
+            theme: d.theme,
+            delta: d.last - d.first
+        }));
+        const biggestRise = trend.reduce((best, current) => current.delta > best.delta ? current : best, trend[0]);
+        const biggestDrop = trend.reduce((best, current) => current.delta < best.delta ? current : best, trend[0]);
+
+        if (summaryEl) {
+            summaryEl.innerHTML = `Le streamgraph montre l’évolution de ${themes.length} thèmes entre ${years[0]} et ${years[years.length - 1]}. ${topThemes} dominent la couverture et constituent ${topShare}% du volume total. Entre les deux extrêmes, <strong>${biggestRise.theme}</strong> a gagné ${d3.format(",")(biggestRise.delta)} unités tandis que <strong>${biggestDrop.theme}</strong> a perdu ${d3.format(",")(Math.abs(biggestDrop.delta))} unités.`;
+        }
+
+        if (legendEl) {
+            legendEl.innerHTML = '';
+            themes.forEach(theme => {
+                const visible = !App.hiddenStreamgraphThemes.has(theme);
+                const button = document.createElement('button');
+                button.className = `streamgraph-legend-item ${visible ? 'active' : 'inactive'}`;
+                button.innerHTML = `<span class="legend-dot" style="background:${color(theme)}"></span><span>${theme}</span>`;
+                button.onclick = () => App.toggleStreamgraphTheme(theme);
+                legendEl.appendChild(button);
+            });
+        }
+
+        App.updateStreamgraphControlButtons();
     },
 
     renderBarometreRadialStacked(data, containerId) {

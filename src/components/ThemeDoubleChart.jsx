@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { csv } from 'd3';
 
 export default function ThemeDoubleChart() {
     const [data, setData] = useState([]);
     const [average, setAverage] = useState(0);
 
     useEffect(() => {
-        const d3 = window.d3;
-        if (!d3) return;
-
-        d3.csv('/csv/ina-csa-parole-femmes-genreprogramme.csv')
+        csv('/csv/ina-csa-parole-femmes-genreprogramme.csv')
             .then(rawData => {
                 let totalWomen = 0;
                 let totalMen = 0;

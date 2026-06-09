@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import * as d3 from 'd3';
 
 export default function Streamgraph({ data }) {
     const containerRef = useRef(null);
@@ -9,7 +10,6 @@ export default function Streamgraph({ data }) {
         if (!container || !data || !data.streamgraph || data.streamgraph.length === 0) return;
 
         container.innerHTML = '';
-        const d3 = window.d3;
 
         const chartData = data.streamgraph;
         const years = chartData.map(d => d.year);

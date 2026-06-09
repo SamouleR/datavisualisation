@@ -14,18 +14,8 @@ export default function Chatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const contextData = `
-    Contexte du projet : Vous êtes un assistant d'analyse de données pour le projet "Les Français face à l'information" (SAE 302).
-    Auteurs du projet : Samuel Ralaikoa, Kinaya Zakaria, Dienaba Sow.
-    RÈGLE STRICTE : Sois extrêmement concis. Fais des réponses très courtes (1 à 2 phrases maximum, pas de longs paragraphes ni de listes à puces superflues).
-    Voici les enseignements principaux tirés des données CSV du projet :
-    1. Parité de la parole : Disparité persistante. La moyenne du temps de parole féminin reste inférieure à 40%. Les chaînes publiques (France TV) montrent une meilleure équité que le privé.
-    2. Hiérarchie des médias : Les groupes majeurs (TF1, M6, France TV) dominent. Forte concentration.
-    3. Cinéma à la TV : Les 50 films les plus diffusés depuis 1950 montrent une hégémonie des comédies populaires françaises (ex: Le Capitan, La Grande Vadrouille).
-    4. Représentation des femmes par média (temps de parole en 2020) :
-    - Les pires (le moins de femmes) : L'Equipe (13%), TMC (21.3%), NRJ (23.1%), RMC Story (23.6%), RMC (25.0%).
-    - Les meilleurs (le plus de femmes) : Fip (70.4%), FRANCE 4 (60.0%), 6TER (48.0%), FRANCE 5 (47.2%), M6 (46.7%).
-  `;
+  const baseContext = `Contexte du projet : Vous êtes un assistant d'analyse de données pour le projet "Les Français face à l'information" (SAE 302). Auteurs : Samuel Ralaikoa, Kinaya Zakaria, Dienaba Sow.`;
+  const guidance = `RÈGLE : Réponses très concises (1-2 phrases). Adapte la réponse selon l'onglet actif : 0=Parité, 1=Hiérarchie, 2=Films, 3=Évolution.`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,8 +37,23 @@ export default function Chatbot() {
     setIsLoading(true);
 
     try {
+      // Build dynamic context using window.App summary if available
+      let dynContext = baseContext + '\n' + guidance + '\n';
+      try {
+        const app = window.App || {};
+        const summary = window.AppSummary || app.summary || {};
+        dynContext += `SlideActive:${app.currentSlide || 0} `;
+        if (summary) {
+          dynContext += `| TotalHours:${summary.totalHours || 0}h | MeanFemaleShare:${summary.meanFemaleShare || 0}% | MediaCount:${summary.mediaCount || 0}`;
+          if (summary.films) dynContext += ` | Films:${summary.films.count} (avgDiff:${summary.films.avgDiffusions})`;
+          if (summary.topThemes && summary.topThemes.length) dynContext += ` | TopThemes:${summary.topThemes.join(',')}`;
+        }
+      } catch (e) {
+        // ignore
+      }
+
       const messagesToSend = [
-        { role: 'user', content: contextData }, // Provide context first
+        { role: 'user', content: dynContext },
         ...messages.filter(m => m.role !== 'assistant' || m.content !== "Bonjour ! Je suis l'assistant de ce projet de Datavisualisation. Posez-moi vos questions sur les données ou le projet !"),
         userMessage
       ];
