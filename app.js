@@ -870,16 +870,17 @@ var App = {
         list.style.flexDirection = 'column';
         list.style.gap = '8px';
 
-        const logoMap = {
+        // Explicit mapping for known group logos (file names in /public/logos)
+        const explicitLogoMap = {
             'Lagardère Active': '/logos/Lagardère_Active.svg',
             'Radio France': '/logos/Radio_France.svg',
             'M6': '/logos/M6.svg',
             'NRJ': '/logos/NRJ.svg',
             'FMM': '/logos/FMM.svg',
             'NextRadioTV': '/logos/NextRadioTV.svg',
-            'NextRadioTV': '/logos/NextRadioTV.svg',
             'CANAL+': '/logos/CANALPlus.svg',
-            'Amaury': '/logos/Amaury.svg'
+            'Amaury': '/logos/Amaury.svg',
+            'TF1': '/logos/TF1.svg'
         };
 
         uniqueItems.forEach(item => {
@@ -913,26 +914,34 @@ var App = {
                 ];
             };
 
-            const candidates = makeCandidates(item);
-            const img = document.createElement('img');
-            img.alt = item;
-            img.style.width = '36px';
-            img.style.height = '24px';
-            img.style.objectFit = 'contain';
-            img.style.borderRadius = '4px';
-            let tried = 0;
-            const tryNext = () => {
-                if (tried >= candidates.length) return;
-                img.src = candidates[tried];
-                img.onload = () => {
-                    btn.insertBefore(img, btn.firstChild);
+            // Prefer explicit mapping when available
+            if (explicitLogoMap[item]) {
+                const img = document.createElement('img');
+                img.src = explicitLogoMap[item];
+                img.alt = item;
+                img.style.width = '36px';
+                img.style.height = '24px';
+                img.style.objectFit = 'contain';
+                img.style.borderRadius = '4px';
+                btn.insertBefore(img, btn.firstChild);
+            } else {
+                // fallback: try candidate filenames but don't block rendering
+                const candidates = makeCandidates(item);
+                const img = document.createElement('img');
+                img.alt = item;
+                img.style.width = '36px';
+                img.style.height = '24px';
+                img.style.objectFit = 'contain';
+                img.style.borderRadius = '4px';
+                let tried = 0;
+                const tryNext = () => {
+                    if (tried >= candidates.length) return;
+                    img.src = candidates[tried];
+                    img.onload = () => btn.insertBefore(img, btn.firstChild);
+                    img.onerror = () => { tried += 1; tryNext(); };
                 };
-                img.onerror = () => {
-                    tried += 1;
-                    tryNext();
-                };
-            };
-            tryNext();
+                tryNext();
+            }
 
             const label = document.createElement('div');
             label.innerText = item;
@@ -1970,6 +1979,22 @@ var Viz = {
         const container = document.getElementById('chart-films'); 
         if(!container) return; 
         container.innerHTML = '';
+        // Ensure container can host absolute-centered info
+        container.style.position = container.style.position || 'relative';
+        // Add center info block for film details
+        const centerInfo = document.createElement('div');
+        centerInfo.className = 'center-info-radial';
+        centerInfo.id = 'radial-info';
+        centerInfo.style.left = '50%';
+        centerInfo.style.top = '50%';
+        centerInfo.style.transform = 'translate(-50%, -50%)';
+        centerInfo.innerHTML = `
+            <span class="center-rank">INFO</span>
+            <div class="center-title">Survolez un film</div>
+            <div class="center-detail">Visualisation Interactive</div>
+            <div class="center-count">--</div>
+        `;
+        container.appendChild(centerInfo);
         
         data.sort((a,b) => b.Diffusions - a.Diffusions);
         
