@@ -864,16 +864,83 @@ var App = {
         topRow.appendChild(btnReset);
         container.appendChild(topRow);
 
-        // Group buttons vertical
+        // Group buttons vertical with logos when available
         const list = document.createElement('div');
         list.style.display = 'flex';
         list.style.flexDirection = 'column';
-        list.style.gap = '6px';
+        list.style.gap = '8px';
+
+        const logoMap = {
+            'Lagardère Active': '/logos/Lagardère_Active.svg',
+            'Radio France': '/logos/Radio_France.svg',
+            'M6': '/logos/M6.svg',
+            'NRJ': '/logos/NRJ.svg',
+            'FMM': '/logos/FMM.svg',
+            'NextRadioTV': '/logos/NextRadioTV.svg',
+            'NextRadioTV': '/logos/NextRadioTV.svg',
+            'CANAL+': '/logos/CANALPlus.svg',
+            'Amaury': '/logos/Amaury.svg'
+        };
+
         uniqueItems.forEach(item => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '10px';
+
             const btn = document.createElement('button');
-            btn.className = 'retro-btn';
+            btn.className = 'retro-btn filter-card-btn';
             btn.setAttribute('data-filter', item);
-            btn.innerText = item;
+            btn.style.display = 'flex';
+            btn.style.alignItems = 'center';
+            btn.style.gap = '8px';
+            btn.style.justifyContent = 'flex-start';
+            btn.style.padding = '6px 8px';
+            btn.style.width = '100%';
+
+            // Try to load a logo from several candidate paths; append when one loads
+            const makeCandidates = (name) => {
+                const base = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const cleaned = base.replace(/\+/g, 'Plus').replace(/[^a-zA-Z0-9\s\-_]/g, '').trim();
+                const underscored = cleaned.replace(/\s+/g, '_');
+                return [
+                    `/logos/${name}.svg`,
+                    `/logos/${underscored}.svg`,
+                    `/logos/${cleaned}.svg`,
+                    `/logos/${underscored}.png`,
+                    `/logos/${underscored}.SVG`,
+                    `/logos/${name.replace(/\s+/g, '_')}.svg`
+                ];
+            };
+
+            const candidates = makeCandidates(item);
+            const img = document.createElement('img');
+            img.alt = item;
+            img.style.width = '36px';
+            img.style.height = '24px';
+            img.style.objectFit = 'contain';
+            img.style.borderRadius = '4px';
+            let tried = 0;
+            const tryNext = () => {
+                if (tried >= candidates.length) return;
+                img.src = candidates[tried];
+                img.onload = () => {
+                    btn.insertBefore(img, btn.firstChild);
+                };
+                img.onerror = () => {
+                    tried += 1;
+                    tryNext();
+                };
+            };
+            tryNext();
+
+            const label = document.createElement('div');
+            label.innerText = item;
+            label.style.flex = '1';
+            label.style.textAlign = 'left';
+            label.style.fontWeight = '700';
+            btn.appendChild(label);
+
             btn.onclick = () => {
                 if (this.activeSunburstGroups.has('Tous')) this.activeSunburstGroups.delete('Tous');
                 if (this.activeSunburstGroups.has(item)) this.activeSunburstGroups.delete(item);
@@ -882,7 +949,9 @@ var App = {
                 this.updateSunburstFilterButtons();
                 if (this.currentSlide === 1) Viz.renderSunburst(this.activeGender, this.activeSunburstGroups, this.activeSunburstMedia);
             };
-            list.appendChild(btn);
+
+            row.appendChild(btn);
+            list.appendChild(row);
         });
         container.appendChild(list);
         this.updateSunburstFilterButtons();
